@@ -1,6 +1,59 @@
 # Wiki Chat
 
-A RAG (Retrieval-Augmented Generation) chat application that lets users upload documents and ask questions about them.
+A RAG (Retrieval-Augmented Generation) chat application that lets users upload documents and ask questions about them. Built with Next.js, OpenAI, and PostgreSQL.
+
+## Features
+
+- Upload PDF or text documents and chat with their contents
+- RAG pipeline with HyDE (Hypothetical Document Embedding) for improved retrieval
+- Cosine similarity search over document embeddings
+- LLM-generated titles for uploaded documents and chat responses
+- Shareable file selections via URL query parameters
+- Email/password authentication via NextAuth
+
+## Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) 20+
+- [pnpm](https://pnpm.io/)
+- A [Neon](https://neon.tech/) PostgreSQL database (or compatible Postgres instance)
+- An [OpenAI API key](https://platform.openai.com/)
+- A [Vercel Blob](https://vercel.com/docs/storage/vercel-blob) store (for PDF processing)
+
+### Installation
+
+```bash
+pnpm install
+```
+
+### Environment Variables
+
+Create a `.env.local` file with:
+
+```ini
+OPENAI_API_KEY=
+POSTGRES_URL=
+BLOB_READ_WRITE_TOKEN=
+AUTH_SECRET=
+```
+
+### Database Setup
+
+```bash
+pnpm db:generate   # Generate migration from schema changes
+pnpm db:migrate    # Run pending migrations
+pnpm db:push       # Push schema directly (dev only, skips migrations)
+```
+
+### Running
+
+```bash
+pnpm dev       # Start development server
+pnpm build     # Production build
+pnpm start     # Start production server
+pnpm lint      # Run ESLint
+```
 
 ## Architecture
 
@@ -51,17 +104,6 @@ The title is stripped from the displayed message and used when saving responses 
 
 Selected files are stored in the URL as repeated `s` query parameters with numeric file IDs (e.g., `?s=12&s=47`), making selections shareable via URL.
 
-## Development
+## License
 
-```bash
-pnpm install
-pnpm dev
-```
-
-### Database
-
-```bash
-pnpm db:generate   # Generate migration from schema changes
-pnpm db:migrate    # Run pending migrations
-pnpm db:push       # Push schema directly (dev only, skips migrations)
-```
+This project is licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). You may share and adapt this work for non-commercial purposes with attribution.

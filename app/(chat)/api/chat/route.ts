@@ -4,7 +4,7 @@ import { createMessage } from "@/app/db";
 import { streamText } from "ai";
 
 const system = `
-You are an expert researcher! Keep your responses concise and helpful.
+You are an expert researcher. Keep your responses concise and helpful.
 
 Your job is to answer the users question in the form of a brief article.
 Articles should be four paragraphs, unless the user asks a simple question
