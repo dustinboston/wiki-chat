@@ -6,10 +6,11 @@ import { SubmitButton } from "@/components/submit-button";
 import { useActionState, useEffect } from "react";
 import { login, LoginActionState } from "../actions";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function Page() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [state, formAction] = useActionState<LoginActionState, FormData>(
     login,
@@ -22,9 +23,10 @@ export default function Page() {
     if (state.status === "failed") {
       toast.error("Invalid credentials!");
     } else if (state.status === "success") {
-      router.refresh();
+      const callbackUrl = searchParams.get("callbackUrl") || "/";
+      router.push(callbackUrl);
     }
-  }, [state.status, router]);
+  }, [state.status, router, searchParams]);
 
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-white dark:bg-zinc-900">

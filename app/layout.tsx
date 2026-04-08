@@ -31,7 +31,7 @@ export default async function RootLayout({
           <div className="flex flex-col h-dvh">
             <Navbar />
             <div className="flex flex-row flex-1 overflow-hidden">
-              <Sidebar />
+              {session && <Sidebar />}
               <main className="flex-1 overflow-auto relative">
                 {children}
                 <FileViewer />
