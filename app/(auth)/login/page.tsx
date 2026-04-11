@@ -23,6 +23,7 @@ export default function Page() {
     if (state.status === "failed") {
       toast.error("Invalid credentials!");
     } else if (state.status === "success") {
+      router.refresh();
       const callbackUrl = searchParams.get("callbackUrl") || "/";
       router.push(callbackUrl);
     }
