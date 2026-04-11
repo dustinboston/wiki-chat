@@ -1,5 +1,7 @@
 # Wiki Chat
 
+![A large W inside of a chat bubble](./logo.png)
+
 A RAG (Retrieval-Augmented Generation) chat application that lets users upload documents and ask questions about them. Built with Next.js, OpenAI, and PostgreSQL.
 
 ## Features
