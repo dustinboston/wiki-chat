@@ -3,20 +3,14 @@ import { desc, eq, inArray } from "drizzle-orm";
 import postgres from "postgres";
 import { genSaltSync, hashSync } from "bcrypt-ts";
 import { chat, chunk, file, user } from "@/schema";
+import { env } from "@/app/env";
 
-// Optionally, if not using email/pass login, you can
-// use the Drizzle adapter for Auth.js / NextAuth
-// https://authjs.dev/reference/adapter/drizzle
 let client: ReturnType<typeof postgres> | null = null;
 let db: ReturnType<typeof drizzle> | null = null;
 
 function getDb() {
   if (!db) {
-    const connectionString = process.env.POSTGRES_URL;
-    if (!connectionString) {
-      throw new Error('POSTGRES_URL environment variable is not set');
-    }
-    client = postgres(`${connectionString}?sslmode=require`);
+    client = postgres(`${env.POSTGRES_URL}?sslmode=require`);
     db = drizzle(client);
   }
   return db;

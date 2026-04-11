@@ -9,9 +9,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    "https://ai-sdk-preview-internal-knowledge-base.vercel.app",
+    process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000",
   ),
-  title: "Internal Knowledge Base",
+  title: "Wiki Chat",
   description:
     "Internal Knowledge Base using Retrieval Augmented Generation and Middleware",
 };
