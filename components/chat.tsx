@@ -1,12 +1,15 @@
 'use client';
 
-import {type Message} from 'ai';
+import {type Message, type JSONValue} from 'ai';
 import {useChat} from 'ai/react';
 import {motion} from 'framer-motion';
+import useSWR from 'swr';
 import {LoaderIcon} from './icons';
 import {useSidebar} from './sidebar-context';
-import {Message as PreviewMessage} from '@/components/message';
+import {Message as PreviewMessage, type AggregatedSource} from '@/components/message';
 import {useScrollToBottom} from '@/components/use-scroll-to-bottom';
+import type {SourceChunk} from '@/ai/rag';
+import {fetcher} from '@/utils/functions';
 
 function parseTitle(content: string): {title: string; body: string} {
 	const idx = content.indexOf('\n\n');
@@ -15,6 +18,32 @@ function parseTitle(content: string): {title: string; body: string} {
 	}
 
 	return {title: content.slice(0, idx).trim(), body: content.slice(idx + 2)};
+}
+
+type SourceAnnotation = {
+	sources: SourceChunk[];
+};
+
+function isSourceAnnotation(value: JSONValue): value is SourceAnnotation {
+	return typeof value === 'object'
+		&& value !== null
+		&& !Array.isArray(value)
+		&& 'sources' in value
+		&& Array.isArray((value as Record<string, unknown>).sources);
+}
+
+function getMessageSources(message: Message): SourceChunk[] {
+	if (!message.annotations) {
+		return [];
+	}
+
+	for (const annotation of message.annotations) {
+		if (isSourceAnnotation(annotation)) {
+			return annotation.sources;
+		}
+	}
+
+	return [];
 }
 
 const suggestedActions = [
@@ -30,6 +59,27 @@ const suggestedActions = [
 	},
 ];
 
+type FileEntry = {
+	id: number;
+	pathname: string;
+	title: string | undefined;
+	sourceType: string;
+};
+
+function aggregateSources(sources: SourceChunk[], fileMap: Map<number, FileEntry>): AggregatedSource[] {
+	const map = new Map<number, AggregatedSource>();
+	for (const source of sources) {
+		const file = fileMap.get(source.fileId);
+		const name = file?.title ?? file?.pathname ?? `File ${source.fileId}`;
+		const existing = map.get(source.fileId);
+		if (!existing || source.similarity > existing.similarity) {
+			map.set(source.fileId, {fileId: source.fileId, name, similarity: source.similarity});
+		}
+	}
+
+	return [...map.values()].toSorted((a, b) => b.similarity - a.similarity);
+}
+
 export function Chat({
 	id,
 	initialMessages,
@@ -38,6 +88,11 @@ export function Chat({
 	initialMessages: Message[];
 }) {
 	const {selectedFileIds, uploadFile} = useSidebar();
+
+	const {data: files} = useSWR<FileEntry[]>('/api/files/list', fetcher, {
+		fallbackData: [],
+	});
+	const fileMap = new Map((files ?? []).map(f => [f.id, f]));
 
 	const {messages, handleSubmit, input, setInput, append, isLoading}
 		= useChat({
@@ -61,7 +116,12 @@ export function Chat({
 		const message = messages[index];
 		const {title, body} = parseTitle(message.content);
 		const filename = `${(title ?? 'Message').replaceAll(/[^a-zA-Z\d\s]/gv, '').trim()} ${Date.now()}.md`;
-		await uploadFile(filename, body, title || undefined);
+		const sources = getMessageSources(message);
+		await uploadFile(filename, body, {
+			title: title || undefined,
+			sourceType: 'generated',
+			sourceChunks: sources.length > 0 ? sources : undefined,
+		});
 	};
 
 	return (
@@ -81,6 +141,7 @@ export function Chat({
 									? parseTitle(message.content).body
 									: message.content
 							}
+							sources={message.role === 'assistant' ? aggregateSources(getMessageSources(message), fileMap) : []}
 							onSaveMessage={(index: number) => {
 								void onSaveMessage(index);
 							}}

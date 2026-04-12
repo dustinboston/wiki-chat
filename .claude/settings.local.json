@@ -6,7 +6,8 @@
       "Bash(npx vitest:*)",
       "Bash(pnpm test:*)",
       "Bash(pnpm build:*)",
-      "Bash(pnpm lint:*)"
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm test:coverage)"
     ]
   }
 }

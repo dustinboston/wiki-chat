@@ -1,0 +1,119 @@
+import {openai} from '@ai-sdk/openai';
+import {
+	cosineSimilarity,
+	embed,
+	generateObject,
+	generateText,
+	type CoreMessage,
+} from 'ai';
+import {z} from 'zod';
+import {getChunksByFileIds} from '@/app/db';
+
+export type SourceChunk = {
+	chunkId: string;
+	fileId: number;
+	similarity: number;
+};
+
+export type RagResult = {
+	messages: CoreMessage[];
+	sources: SourceChunk[];
+};
+
+export async function retrieveAndAugment({
+	messages,
+	fileIds,
+}: {
+	messages: CoreMessage[];
+	fileIds: number[];
+}): Promise<RagResult> {
+	if (fileIds.length === 0) {
+		return {messages, sources: []};
+	}
+
+	const augmented = [...messages];
+	const recentMessage = augmented.pop();
+
+	if (recentMessage?.role !== 'user') {
+		if (recentMessage) {
+			augmented.push(recentMessage);
+		}
+
+		return {messages: augmented, sources: []};
+	}
+
+	const lastUserMessageContent
+		= typeof recentMessage.content === 'string'
+			? recentMessage.content
+			: recentMessage.content
+				.filter(part => part.type === 'text')
+				.map(part => part.text)
+				.join('\n');
+
+	// Classify the user prompt as whether it requires more context or not
+	const {object: classification} = await generateObject({
+		model: openai('gpt-4o-mini', {structuredOutputs: true}),
+		output: 'enum',
+		enum: ['question', 'statement', 'other'],
+		system: 'classify the user message as a question, statement, or other',
+		prompt: lastUserMessageContent,
+	});
+
+	// Only use RAG for questions
+	if (classification !== 'question') {
+		augmented.push(recentMessage);
+		return {messages: augmented, sources: []};
+	}
+
+	// Use hypothetical document embeddings (HyDE)
+	const {text: hypotheticalAnswer} = await generateText({
+		model: openai('gpt-4o-mini', {structuredOutputs: true}),
+		system: 'Answer the users question:',
+		prompt: lastUserMessageContent,
+	});
+
+	const {embedding: hypotheticalAnswerEmbedding} = await embed({
+		model: openai.embedding('text-embedding-3-small'),
+		value: hypotheticalAnswer,
+	});
+
+	const chunksBySelection = await getChunksByFileIds({fileIds});
+
+	const chunksWithSimilarity = chunksBySelection.map(chunk => ({
+		...chunk,
+		similarity: cosineSimilarity(
+			hypotheticalAnswerEmbedding,
+			chunk.embedding,
+		),
+	}));
+
+	chunksWithSimilarity.sort((a, b) => b.similarity - a.similarity);
+	const k = 10;
+	const topKChunks = chunksWithSimilarity.slice(0, k);
+
+	// Build augmented messages with context
+	augmented.push({
+		role: 'user',
+		content: [
+			...(typeof recentMessage.content === 'string'
+				? [{type: 'text' as const, text: recentMessage.content}]
+				: recentMessage.content),
+			{
+				type: 'text',
+				text: 'Here is some relevant information that you can use to answer the question:',
+			},
+			...topKChunks.map(chunk => ({
+				type: 'text' as const,
+				text: chunk.content,
+			})),
+		],
+	});
+
+	const sources: SourceChunk[] = topKChunks.map(chunk => ({
+		chunkId: chunk.id,
+		fileId: chunk.fileId,
+		similarity: chunk.similarity,
+	}));
+
+	return {messages: augmented, sources};
+}

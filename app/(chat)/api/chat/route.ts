@@ -1,8 +1,14 @@
-import {type Message, streamText} from 'ai';
+import {
+	type Message,
+	convertToCoreMessages,
+	createDataStreamResponse,
+	streamText,
+} from 'ai';
 import {z} from 'zod';
-import {customModel} from '@/ai';
+import {openai} from '@ai-sdk/openai';
 import {auth} from '@/app/(auth)/auth';
 import {createMessage} from '@/app/db';
+import {retrieveAndAugment, type SourceChunk} from '@/ai/rag';
 
 function isMessage(item: unknown): item is Message {
 	return typeof item === 'object'
@@ -26,7 +32,7 @@ You are an expert researcher. Keep your responses concise and helpful.
 
 Your job is to answer the users question in the form of a brief article.
 Articles should be four paragraphs, unless the user asks a simple question
-that can be answered in a sentence or less. Use the documents that you have as 
+that can be answered in a sentence or less. Use the documents that you have as
 a primary source, filling in gaps with your own knowledge of a topic.
 
 Once you have completed the article, examine it closely for inaccurate or false
@@ -54,28 +60,46 @@ export async function POST(request: Request) {
 
 	const userEmail = session.user.email;
 
-	const result = streamText({
-		model: customModel,
-		temperature: 0,
-		system,
-		messages,
-		experimental_providerMetadata: {
-			files: {
-				selection: selectedFileIds,
-			},
-		},
-		async onFinish({text}) {
-			await createMessage({
-				id,
-				messages: [...messages, {id, role: 'assistant' as const, content: text}],
-				author: userEmail,
-			});
-		},
-		experimental_telemetry: {
-			isEnabled: true,
-			functionId: 'stream-text',
-		},
+	// Run RAG retrieval to get augmented messages and source chunks
+	const {messages: augmentedMessages, sources} = await retrieveAndAugment({
+		messages: convertToCoreMessages(messages),
+		fileIds: selectedFileIds,
 	});
 
-	return result.toDataStreamResponse({});
+	return createDataStreamResponse({
+		execute(dataStream) {
+			// Write source annotations so the client can display them
+			if (sources.length > 0) {
+				dataStream.writeMessageAnnotation({sources});
+			}
+
+			const result = streamText({
+				model: openai('gpt-5.4-2026-03-05'),
+				temperature: 0,
+				system,
+				messages: augmentedMessages,
+				async onFinish({text}) {
+					await createMessage({
+						id,
+						messages: [
+							...messages,
+							{
+								id,
+								role: 'assistant' as const,
+								content: text,
+								annotations: sources.length > 0 ? [{sources}] : undefined,
+							},
+						],
+						author: userEmail,
+					});
+				},
+				experimental_telemetry: {
+					isEnabled: true,
+					functionId: 'stream-text',
+				},
+			});
+
+			result.mergeIntoDataStream(dataStream);
+		},
+	});
 }

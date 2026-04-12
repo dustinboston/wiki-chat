@@ -21,7 +21,7 @@ app/            Next.js App Router pages and API routes
   (chat)/       Chat UI and API routes (/api/chat, /api/files, /api/history)
   db.ts         Database access functions
   env.ts        Zod-validated environment variables
-ai/             RAG middleware (rag-middleware.ts)
+ai/             RAG retrieval (rag.ts) and model config (index.ts)
 components/     React components (sidebar, navbar, chat, file viewer)
 schema.ts       Drizzle ORM table definitions
 drizzle/        SQL migration files
@@ -59,8 +59,8 @@ Create `.env.local` with these values for local development.
 
 ## Key Patterns
 
-- **RAG pipeline** is in `ai/rag-middleware.ts` — classifies messages, generates hypothetical answers (HyDE), retrieves chunks by cosine similarity, then augments the prompt.
+- **RAG pipeline** is in `ai/rag.ts` — classifies messages, generates hypothetical answers (HyDE), retrieves chunks by cosine similarity, then augments the prompt. Returns source chunk metadata for provenance tracking.
 - **Database functions** are in `app/db.ts` — all DB access goes through this module.
-- **Schema** is in `schema.ts` — tables: User, Chat, File, Chunk.
+- **Schema** is in `schema.ts` — tables: User, Chat, File, Chunk, FileSource.
 - **Migrations** live in `drizzle/` and are generated via `pnpm db:generate`.
 - The `@/*` path alias maps to the project root.

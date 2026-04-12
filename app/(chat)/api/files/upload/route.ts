@@ -2,14 +2,30 @@ import {openai} from '@ai-sdk/openai';
 import {RecursiveCharacterTextSplitter} from '@langchain/textsplitters';
 import {del, put} from '@vercel/blob';
 import {embedMany} from 'ai';
+import {z} from 'zod';
 import {getPdfContentFromUrl} from '@/utils/pdf';
-import {createFile, deleteFileById, insertChunks} from '@/app/db';
+import {
+	createFile, insertChunks, insertFileSources,
+} from '@/app/db';
 import {auth} from '@/app/(auth)/auth';
+import type {FileSourceType} from '@/schema';
+
+function isFileSourceType(value: string): value is FileSourceType {
+	return value === 'upload' || value === 'generated' || value === 'manual';
+}
+
+const sourceChunkSchema = z.array(z.object({
+	chunkId: z.string(),
+	fileId: z.number(),
+	similarity: z.number(),
+}));
 
 export async function POST(request: Request) {
 	const {searchParams} = new URL(request.url);
 	const filename = searchParams.get('filename');
 	const titleParameter = searchParams.get('title');
+	const sourceTypeParameter = searchParams.get('sourceType') ?? 'upload';
+	const sourceType: FileSourceType = isFileSourceType(sourceTypeParameter) ? sourceTypeParameter : 'upload';
 
 	if (!filename) {
 		return new Response('Missing filename parameter', {status: 400});
@@ -33,6 +49,7 @@ export async function POST(request: Request) {
 
 	const contentType = request.headers.get('content-type') ?? '';
 	let content: string;
+	let sourceChunks: z.infer<typeof sourceChunkSchema> = [];
 
 	if (contentType.includes('application/pdf')) {
 		const {downloadUrl, url} = await put(
@@ -44,6 +61,14 @@ export async function POST(request: Request) {
 		);
 		content = await getPdfContentFromUrl(downloadUrl);
 		await del(url);
+	} else if (contentType.includes('application/json')) {
+		const json: unknown = await request.json();
+		const parsed = z.object({
+			content: z.string(),
+			sourceChunks: sourceChunkSchema.optional(),
+		}).parse(json);
+		content = parsed.content;
+		sourceChunks = parsed.sourceChunks ?? [];
 	} else {
 		content = await request.text();
 	}
@@ -62,6 +87,7 @@ export async function POST(request: Request) {
 		pathname: filename,
 		title: titleParameter ?? null,
 		userEmail: user.email,
+		sourceType,
 	});
 
 	await insertChunks({
@@ -72,6 +98,17 @@ export async function POST(request: Request) {
 			embedding: embeddings[i],
 		})),
 	});
+
+	// Record provenance for generated files
+	if (sourceChunks.length > 0) {
+		await insertFileSources({
+			sources: sourceChunks.map(sc => ({
+				fileId: fileRecord.id,
+				sourceChunkId: sc.chunkId,
+				similarity: sc.similarity,
+			})),
+		});
+	}
 
 	return Response.json({id: fileRecord.id});
 }

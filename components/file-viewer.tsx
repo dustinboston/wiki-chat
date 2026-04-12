@@ -1,7 +1,75 @@
 'use client';
 
+import useSWR from 'swr';
 import {useSidebar} from './sidebar-context';
 import {LoaderIcon} from './icons';
+import {fetcher} from '@/utils/functions';
+
+type SourceFile = {
+	fileId: number;
+	title: string | null;
+	pathname: string;
+	similarity: number;
+};
+
+type DerivedFile = {
+	fileId: number;
+	title: string | null;
+	pathname: string;
+};
+
+type SourcesData = {
+	sourceType: string;
+	sources: SourceFile[];
+	derived: DerivedFile[];
+};
+
+function ProvenanceInfo({fileId}: {fileId: number | null}) {
+	const {data, isLoading} = useSWR<SourcesData>(
+		fileId ? `/api/files/sources?id=${fileId}` : null,
+		fetcher,
+	);
+
+	if (isLoading || !data) {
+		return null;
+	}
+
+	const hasSources = data.sources.length > 0;
+	const hasDerived = data.derived.length > 0;
+
+	if (!hasSources && !hasDerived) {
+		return null;
+	}
+
+	return (
+		<div className='flex flex-col gap-2 text-xs text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700 pb-3'>
+			{hasSources && (
+				<div>
+					<div className='font-medium text-zinc-600 dark:text-zinc-300 mb-1'>Generated from:</div>
+					<ul className='space-y-0.5 pl-2 border-l border-zinc-300 dark:border-zinc-600'>
+						{data.sources.map(source => (
+							<li key={source.fileId} className='truncate'>
+								{source.title ?? source.pathname}
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
+			{hasDerived && (
+				<div>
+					<div className='font-medium text-zinc-600 dark:text-zinc-300 mb-1'>Used to generate:</div>
+					<ul className='space-y-0.5 pl-2 border-l border-zinc-300 dark:border-zinc-600'>
+						{data.derived.map(d => (
+							<li key={d.fileId} className='truncate'>
+								{d.title ?? d.pathname}
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
+		</div>
+	);
+}
 
 export function FileViewer() {
 	const {viewingFile, isLoadingFileContent, closeFileViewer} = useSidebar();
@@ -35,6 +103,7 @@ export function FileViewer() {
 					)
 					: (
 						<div className='flex flex-col gap-4 w-full md:w-[500px] px-4 md:px-0 py-4'>
+							<ProvenanceInfo fileId={viewingFile?.fileId ?? null} />
 							<div className='text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap'>
 								{viewingFile?.content}
 							</div>

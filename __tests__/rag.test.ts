@@ -2,10 +2,9 @@ import {
 	describe, it, expect, vi, beforeEach,
 } from 'vitest';
 import {
-	type LanguageModelV1Prompt,
 	generateObject, generateText, embed, cosineSimilarity,
 } from 'ai';
-import {ragMiddleware} from '@/ai/rag-middleware';
+import {retrieveAndAugment} from '@/ai/rag';
 import {getChunksByFileIds} from '@/app/db';
 
 const {
@@ -39,32 +38,6 @@ vi.mock('ai', () => ({
 	cosineSimilarity: mockCosineSimilarity,
 }));
 
-const transformParameters = ragMiddleware.transformParams;
-
-function makeUserMessage(text: string) {
-	return {
-		role: 'user' as const,
-		content: [{type: 'text' as const, text}],
-	};
-}
-
-function makeParameters(
-	messages: LanguageModelV1Prompt,
-	fileIds?: number[],
-) {
-	return {
-		type: 'generate' as const,
-		params: {
-			inputFormat: 'messages' as const,
-			mode: {type: 'regular' as const},
-			prompt: [...messages],
-			providerMetadata: fileIds
-				? {files: {selection: fileIds}}
-				: undefined,
-		},
-	};
-}
-
 type TextPart = {type: string; text: string};
 
 function isTextPart(part: unknown): part is TextPart {
@@ -77,78 +50,45 @@ function isTextPart(part: unknown): part is TextPart {
 		&& (part as Record<string, unknown>).type === 'text';
 }
 
-describe('ragMiddleware.transformParams', () => {
+describe('retrieveAndAugment', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
 
-	it('returns params unchanged when no provider metadata', async () => {
-		if (!transformParameters) {
-			throw new Error('transformParams not defined');
-		}
-
-		const message = makeUserMessage('hello');
-		const input = makeParameters([message]);
-		const result = await transformParameters(input);
-		expect(result).toBe(input.params);
+	it('returns messages unchanged when fileIds is empty', async () => {
+		const messages = [{role: 'user' as const, content: 'hello'}];
+		const result = await retrieveAndAugment({messages, fileIds: []});
+		expect(result.messages).toEqual(messages);
+		expect(result.sources).toEqual([]);
 	});
 
-	it('returns params unchanged when selection is empty', async () => {
-		if (!transformParameters) {
-			throw new Error('transformParams not defined');
-		}
-
-		const message = makeUserMessage('hello');
-		const input = makeParameters([message], []);
-		const result = await transformParameters(input);
-		expect(result).toBe(input.params);
+	it('returns messages unchanged when last message is not user role', async () => {
+		const messages = [{role: 'assistant' as const, content: 'hi'}];
+		const result = await retrieveAndAugment({messages, fileIds: [1]});
+		expect(result.messages).toHaveLength(1);
+		expect(result.messages[0].role).toBe('assistant');
+		expect(result.sources).toEqual([]);
 	});
 
-	it('returns params unchanged when last message is not user role', async () => {
-		if (!transformParameters) {
-			throw new Error('transformParams not defined');
-		}
-
-		const message = {role: 'assistant' as const, content: [{type: 'text' as const, text: 'hi'}]};
-		const input = makeParameters([message], [1]);
-		const result = await transformParameters(input);
-		expect(result.prompt).toHaveLength(1);
-		expect(result.prompt[0].role).toBe('assistant');
+	it('returns messages unchanged when messages array is empty', async () => {
+		const result = await retrieveAndAugment({messages: [], fileIds: [1]});
+		expect(result.messages).toHaveLength(0);
+		expect(result.sources).toEqual([]);
 	});
 
-	it('returns params unchanged when messages array is empty', async () => {
-		if (!transformParameters) {
-			throw new Error('transformParams not defined');
-		}
-
-		const input = makeParameters([], [1]);
-		const result = await transformParameters(input);
-		expect(result.prompt).toHaveLength(0);
-	});
-
-	it('returns params unchanged when classification is not a question', async () => {
-		if (!transformParameters) {
-			throw new Error('transformParams not defined');
-		}
-
-		const message = makeUserMessage('The sky is blue.');
-		const input = makeParameters([message], [1]);
-
+	it('returns messages unchanged when classification is not a question', async () => {
+		const messages = [{role: 'user' as const, content: 'The sky is blue.'}];
 		mockGenerateObject.mockResolvedValue({object: 'statement'});
 
-		const result = await transformParameters(input);
-		expect(result.prompt).toHaveLength(1);
-		expect(result.prompt[0].content).toEqual(message.content);
+		const result = await retrieveAndAugment({messages, fileIds: [1]});
+		expect(result.messages).toHaveLength(1);
+		expect(result.messages[0].content).toBe('The sky is blue.');
+		expect(result.sources).toEqual([]);
 		expect(mockGenerateText).not.toHaveBeenCalled();
 	});
 
-	it('performs RAG pipeline for questions', async () => {
-		if (!transformParameters) {
-			throw new Error('transformParams not defined');
-		}
-
-		const message = makeUserMessage('What is quantum computing?');
-		const input = makeParameters([message], [1, 2]);
+	it('performs RAG pipeline for questions and returns sources', async () => {
+		const messages = [{role: 'user' as const, content: 'What is quantum computing?'}];
 
 		mockGenerateObject.mockResolvedValue({object: 'question'});
 		mockGenerateText.mockResolvedValue({text: 'Quantum computing uses qubits...'});
@@ -170,20 +110,19 @@ describe('ragMiddleware.transformParams', () => {
 			.mockReturnValueOnce(0.5)
 			.mockReturnValueOnce(0.7);
 
-		const result = await transformParameters(input);
+		const result = await retrieveAndAugment({messages, fileIds: [1, 2]});
 
 		expect(mockGenerateObject).toHaveBeenCalledOnce();
 		expect(mockGenerateText).toHaveBeenCalledOnce();
 		expect(mockEmbed).toHaveBeenCalledOnce();
 		expect(mockGetChunks).toHaveBeenCalledWith({fileIds: [1, 2]});
 
-		const lastMessage = result.prompt.at(-1);
+		// Check augmented messages
+		const lastMessage = result.messages.at(-1);
 		expect(lastMessage).toBeDefined();
 		expect(lastMessage?.role).toBe('user');
 
 		if (lastMessage && Array.isArray(lastMessage.content)) {
-			expect(lastMessage.content).toHaveLength(5);
-
 			const chunkTexts = lastMessage.content
 				.filter(part => isTextPart(part))
 				.map(part => (part as TextPart).text);
@@ -192,22 +131,52 @@ describe('ragMiddleware.transformParams', () => {
 			expect(chunkTexts).toContain('Chunk B');
 			expect(chunkTexts).toContain('Chunk C');
 
+			// Check sorted by similarity: A(0.9) > C(0.7) > B(0.5)
 			const indexA = chunkTexts.indexOf('Chunk A');
 			const indexC = chunkTexts.indexOf('Chunk C');
 			const indexB = chunkTexts.indexOf('Chunk B');
 			expect(indexA).toBeLessThan(indexC);
 			expect(indexC).toBeLessThan(indexB);
 		}
+
+		// Check sources returned
+		expect(result.sources).toHaveLength(3);
+		expect(result.sources[0]).toEqual({chunkId: '1/0', fileId: 1, similarity: 0.9});
+		expect(result.sources[1]).toEqual({chunkId: '2/0', fileId: 2, similarity: 0.7});
+		expect(result.sources[2]).toEqual({chunkId: '1/1', fileId: 1, similarity: 0.5});
+	});
+
+	it('extracts text from multi-part content on user message', async () => {
+		const messages = [{
+			role: 'user' as const,
+			content: [
+				{type: 'text' as const, text: 'What is AI?'},
+				{type: 'image' as const, image: new Uint8Array()},
+				{type: 'text' as const, text: 'Explain briefly.'},
+			],
+		}];
+
+		mockGenerateObject.mockResolvedValue({object: 'question'});
+		mockGenerateText.mockResolvedValue({text: 'AI is...'});
+		mockEmbed.mockResolvedValue({embedding: [0.1]});
+		mockGetChunks.mockResolvedValue([
+			{
+				id: '1/0', fileId: 1, content: 'Chunk A', embedding: [0.1],
+			},
+		]);
+		mockCosineSimilarity.mockReturnValueOnce(0.9);
+
+		const result = await retrieveAndAugment({messages, fileIds: [1]});
+
+		// Classification prompt should join the two text parts
+		expect(mockGenerateObject).toHaveBeenCalledWith(expect.objectContaining({prompt: 'What is AI?\nExplain briefly.'}));
+
+		expect(result.sources).toHaveLength(1);
+		expect(result.sources[0].chunkId).toBe('1/0');
 	});
 
 	it('limits to top 10 chunks', async () => {
-		if (!transformParameters) {
-			throw new Error('transformParams not defined');
-		}
-
-		const message = makeUserMessage('What is AI?');
-		const fileIds = [1];
-		const input = makeParameters([message], fileIds);
+		const messages = [{role: 'user' as const, content: 'What is AI?'}];
 
 		mockGenerateObject.mockResolvedValue({object: 'question'});
 		mockGenerateText.mockResolvedValue({text: 'AI is...'});
@@ -225,10 +194,13 @@ describe('ragMiddleware.transformParams', () => {
 			mockCosineSimilarity.mockReturnValueOnce(1 - (index * 0.05));
 		}
 
-		const result = await transformParameters(input);
-		const lastMessage = result.prompt.at(-1);
+		const result = await retrieveAndAugment({messages, fileIds: [1]});
 
+		expect(result.sources).toHaveLength(10);
+
+		const lastMessage = result.messages.at(-1);
 		if (lastMessage && Array.isArray(lastMessage.content)) {
+			// 1 original text + 1 context header + 10 chunks = 12
 			expect(lastMessage.content).toHaveLength(12);
 		}
 	});

@@ -26,6 +26,7 @@ type FileEntry = {
 	id: number;
 	pathname: string;
 	title: string | undefined;
+	sourceType?: string;
 };
 
 function FileListItem({
@@ -44,6 +45,7 @@ function FileListItem({
 	onView: () => void;
 }) {
 	const displayName = file.title ?? file.pathname;
+	const sourceLabel = file.sourceType === 'generated' ? 'GEN' : (file.sourceType === 'manual' ? 'NOTE' : undefined);
 
 	return (
 		<div
@@ -81,6 +83,11 @@ function FileListItem({
 				<div className='flex-1 text-sm text-zinc-500 dark:text-zinc-400 truncate'>
 					{displayName}
 				</div>
+				{sourceLabel && (
+					<span className='flex-shrink-0 text-[10px] px-1 py-0.5 rounded bg-zinc-200 dark:bg-zinc-600 text-zinc-500 dark:text-zinc-400'>
+						{sourceLabel}
+					</span>
+				)}
 			</div>
 
 			<div

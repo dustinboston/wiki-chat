@@ -3,12 +3,13 @@ import {
 } from 'vitest';
 import {type Session} from 'next-auth';
 import {POST as postChat} from '@/app/(chat)/api/chat/route';
-import {createMessage} from '@/app/db';
 
-const {mockAuth, mockStreamText, mockCreateMessage} = vi.hoisted(() => ({
+const {mockAuth, mockStreamText, mockCreateMessage, mockRetrieveAndAugment, mockCreateDataStreamResponse} = vi.hoisted(() => ({
 	mockAuth: vi.fn(),
 	mockStreamText: vi.fn(),
 	mockCreateMessage: vi.fn(),
+	mockRetrieveAndAugment: vi.fn(),
+	mockCreateDataStreamResponse: vi.fn(),
 }));
 
 vi.mock('@/app/(auth)/auth', () => ({
@@ -19,12 +20,18 @@ vi.mock('@/app/db', () => ({
 	createMessage: mockCreateMessage.mockResolvedValue(undefined),
 }));
 
-vi.mock('@/ai', () => ({
-	customModel: 'mocked-model',
+vi.mock('@/ai/rag', () => ({
+	retrieveAndAugment: mockRetrieveAndAugment,
+}));
+
+vi.mock('@ai-sdk/openai', () => ({
+	openai: vi.fn().mockReturnValue('mocked-model'),
 }));
 
 vi.mock('ai', () => ({
 	streamText: mockStreamText,
+	createDataStreamResponse: mockCreateDataStreamResponse,
+	convertToCoreMessages: (messages: unknown[]) => messages,
 }));
 
 function mockSession(email: string): Session {
@@ -34,6 +41,15 @@ function mockSession(email: string): Session {
 describe('POST /api/chat', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mockRetrieveAndAugment.mockResolvedValue({messages: [], sources: []});
+		mockCreateDataStreamResponse.mockImplementation(({execute}: {execute: (ds: Record<string, unknown>) => void}) => {
+			const mockDataStream = {
+				writeMessageAnnotation: vi.fn(),
+			};
+
+			execute(mockDataStream);
+			return new Response('stream');
+		});
 	});
 
 	it('returns 401 when not authenticated', async () => {
@@ -54,12 +70,16 @@ describe('POST /api/chat', () => {
 		expect(await response.text()).toBe('Unauthorized');
 	});
 
-	it('calls streamText with correct parameters when authenticated', async () => {
+	it('calls retrieveAndAugment and streamText when authenticated', async () => {
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
 
-		const mockResponse = new Response('streamed data');
+		const augmentedMessages = [{role: 'user', content: 'augmented'}];
+		mockRetrieveAndAugment.mockResolvedValue({
+			messages: augmentedMessages,
+			sources: [],
+		});
 		mockStreamText.mockReturnValue({
-			toDataStreamResponse: vi.fn().mockReturnValue(mockResponse),
+			mergeIntoDataStream: vi.fn(),
 		});
 
 		const messages = [{role: 'user', content: 'hello'}];
@@ -73,21 +93,26 @@ describe('POST /api/chat', () => {
 			}),
 		});
 
-		const response = await postChat(request);
+		await postChat(request);
 
-		expect(mockStreamText).toHaveBeenCalledWith(expect.objectContaining({
-			model: 'mocked-model',
-			temperature: 0,
+		expect(mockRetrieveAndAugment).toHaveBeenCalledWith({
 			messages,
-			experimental_providerMetadata: {
-				files: {selection: [1, 2]},
-			},
+			fileIds: [1, 2],
+		});
+		expect(mockStreamText).toHaveBeenCalledWith(expect.objectContaining({
+			temperature: 0,
+			messages: augmentedMessages,
 		}));
-		expect(response).toBe(mockResponse);
 	});
 
-	it('onFinish callback saves the message to the database', async () => {
+	it('onFinish callback saves the message with source annotations', async () => {
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
+
+		const sources = [{chunkId: 'c1', fileId: 1, similarity: 0.9}];
+		mockRetrieveAndAugment.mockResolvedValue({
+			messages: [{role: 'user', content: 'hello'}],
+			sources,
+		});
 
 		let capturedOnFinish: ((arguments_: {text: string}) => Promise<void>) | undefined;
 		mockStreamText.mockImplementation((options: {onFinish?: (arguments_: {text: string}) => Promise<void>}) => {
@@ -95,9 +120,7 @@ describe('POST /api/chat', () => {
 				capturedOnFinish = options.onFinish;
 			}
 
-			return {
-				toDataStreamResponse: vi.fn().mockReturnValue(new Response('ok')),
-			};
+			return {mergeIntoDataStream: vi.fn()};
 		});
 
 		const messages = [{role: 'user', content: 'hello'}];
@@ -116,7 +139,12 @@ describe('POST /api/chat', () => {
 
 		expect(mockCreateMessage).toHaveBeenCalledWith({
 			id: 'chat-1',
-			messages: [...messages, {id: 'chat-1', role: 'assistant', content: 'AI response'}],
+			messages: [...messages, {
+				id: 'chat-1',
+				role: 'assistant',
+				content: 'AI response',
+				annotations: [{sources}],
+			}],
 			author: 'a@b.com',
 		});
 	});

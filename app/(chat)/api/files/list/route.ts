@@ -20,5 +20,6 @@ export async function GET() {
 		id: f.id,
 		pathname: f.pathname,
 		title: f.title,
+		sourceType: f.sourceType,
 	})));
 }

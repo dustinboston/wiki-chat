@@ -14,6 +14,7 @@ import {useSearchParams, useRouter, usePathname} from 'next/navigation';
 import {mutate} from 'swr';
 import {type Session} from 'next-auth';
 import {z} from 'zod';
+import type {SourceChunk} from '@/ai/rag';
 
 const fileContentSchema = z.object({
 	content: z.string(),
@@ -24,6 +25,12 @@ const uploadResponseSchema = z.object({
 	id: z.number(),
 });
 
+export type UploadOptions = {
+	title?: string;
+	sourceType?: 'upload' | 'generated' | 'manual';
+	sourceChunks?: SourceChunk[];
+};
+
 type SidebarContextType = {
 	selectedFileIds: number[];
 	setSelectedFileIds: Dispatch<SetStateAction<number[]>>;
@@ -31,8 +38,8 @@ type SidebarContextType = {
 	setIsSidebarOpen: Dispatch<SetStateAction<boolean>>;
 	toggleSidebar: () => void;
 	uploadQueue: string[];
-	uploadFile: (name: string, content: string | File, title?: string) => Promise<number | null>;
-	viewingFile: {pathname: string; content: string; truncated: boolean} | null;
+	uploadFile: (name: string, content: string | File, options?: UploadOptions) => Promise<number | null>;
+	viewingFile: {fileId: number; pathname: string; content: string; truncated: boolean} | null;
 	isLoadingFileContent: boolean;
 	viewFile: (fileId: number, title: string) => Promise<void>;
 	closeFileViewer: () => void;
@@ -67,6 +74,7 @@ export function SidebarProvider({
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 	const [uploadQueue, setUploadQueue] = useState<string[]>([]);
 	const [viewingFile, setViewingFile] = useState<{
+		fileId: number;
 		pathname: string;
 		content: string;
 		truncated: boolean;
@@ -93,7 +101,9 @@ export function SidebarProvider({
 			if (response.ok) {
 				const json: unknown = await response.json();
 				const data = fileContentSchema.parse(json);
-				setViewingFile({pathname: title, content: data.content, truncated: data.truncated});
+				setViewingFile({
+					fileId, pathname: title, content: data.content, truncated: data.truncated,
+				});
 			}
 		} finally {
 			setIsLoadingFileContent(false);
@@ -105,19 +115,36 @@ export function SidebarProvider({
 	}, []);
 
 	const uploadFile = useCallback(
-		async (name: string, content: string | File, title?: string): Promise<number | null> => {
+		async (name: string, content: string | File, options?: UploadOptions): Promise<number | null> => {
 			setUploadQueue(queue => [...queue, name]);
 
 			const parameters = new URLSearchParams({filename: name});
-			if (title) {
-				parameters.set('title', title);
+			if (options?.title) {
+				parameters.set('title', options.title);
+			}
+
+			if (options?.sourceType) {
+				parameters.set('sourceType', options.sourceType);
+			}
+
+			let body: string | File | Blob;
+			let headers: Record<string, string> = {};
+
+			if (content instanceof File) {
+				body = content;
+			} else if (options?.sourceChunks && options.sourceChunks.length > 0) {
+				// Send as JSON when we have source chunks to include
+				body = JSON.stringify({content, sourceChunks: options.sourceChunks});
+				headers = {'Content-Type': 'application/json'};
+			} else {
+				body = content;
+				headers = {'Content-Type': 'text/plain'};
 			}
 
 			const response = await fetch(`/api/files/upload?${parameters}`, {
 				method: 'POST',
-				body: content,
-				headers:
-          typeof content === 'string' ? {'Content-Type': 'text/plain'} : {},
+				body,
+				headers,
 			});
 
 			setUploadQueue(queue => queue.filter(item => item !== name));
