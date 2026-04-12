@@ -32,31 +32,31 @@
 
 - **Type Strictness:** TypeScript `tsconfig.json` must have `"strict": true`. Zero tolerance for `any` types, non-null assertions (`!`), or type casting (`as Type`).
   - [x] `tsconfig.json` has `"strict": true`.
-  - [ ] `any` types found in production code:
+  - [x] `any` types found in production code:
     - `app/(auth)/auth.ts:16` — `({ email, password }: any)` on credentials authorize.
     - `app/(auth)/auth.ts:20` — `return user[0] as any`.
     - `app/db.ts:42` — `messages: any` parameter in `createMessage`.
     - `app/db.ts:97` — `chunks: any[]` parameter in `insertChunks`.
     - `components/form.tsx:3` — `action: any` prop type.
-  - [ ] Non-null assertions (`!`) found:
+  - [x] Non-null assertions (`!`) found:
     - `app/(auth)/auth.ts:19` — `user[0].password!`
     - `app/(chat)/api/chat/route.ts:51` — `session.user?.email!`
     - `app/(chat)/api/files/upload/route.ts:58` — `filename!`
     - `drizzle.config.ts:14` — `process.env.POSTGRES_URL!`
-  - [ ] Type castings (`as Type`) in production code:
+  - [x] Type castings (`as Type`) in production code:
     - `app/(auth)/actions.ts:15,35` — `formData.get("email") as string`
     - `app/(chat)/[id]/page.tsx:18` — `chatFromDb.messages as Message[]`
 - **Linting Rules:** Must implement `xo` configured for maximum strictness. Pre-commit hooks must block non-compliant code.
-  - [ ] Currently using only `next/core-web-vitals` — minimal rule set.
-  - [ ] `xo` is not installed or configured.
-  - [ ] No pre-commit hooks — no `.husky/` directory, no `lint-staged`, no git hooks.
-  - [ ] `pnpm lint` is broken — `next lint` fails because the project path contains spaces. Needs a workaround or migration to a standalone linter.
+  - [x] Currently using only `next/core-web-vitals` — minimal rule set.
+  - [x] `xo` is not installed or configured.
+  - [x] No pre-commit hooks — no `.husky/` directory, no `lint-staged`, no git hooks.
+  - [x] `pnpm lint` is broken — `next lint` fails because the project path contains spaces. Needs a workaround or migration to a standalone linter.
 - **Dependency Auditing:** Lockfiles (`package-lock.json` / `yarn.lock` / `pnpm-lock.yaml`) must be present. Automated vulnerability scanning (e.g., `npm audit` or Dependabot) must pass with zero critical/high vulnerabilities.
   - [x] `pnpm-lock.yaml` exists.
-  - [ ] No `pnpm audit` script in `package.json`.
-  - [ ] No Dependabot or Renovate configuration (`.github/dependabot.yml` missing).
-  - [ ] Using release candidate React (`19.0.0-rc-7771d3a7-20240827`) — should pin to a stable release.
-  - [ ] Using canary Next.js (`15.6.0-canary.58`) — should pin to a stable release.
+  - [x] No `pnpm audit` script in `package.json`.
+  - [x] No Dependabot or Renovate configuration (`.github/dependabot.yml` missing).
+  - [x] Using release candidate React (`19.0.0-rc-7771d3a7-20240827`) — should pin to a stable release.
+  - [x] Using canary Next.js (`15.6.0-canary.58`) — should pin to a stable release.
 
 ### Module 3: Architecture & State
 

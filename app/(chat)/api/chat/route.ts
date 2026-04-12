@@ -1,7 +1,25 @@
-import { customModel } from "@/ai";
-import { auth } from "@/app/(auth)/auth";
-import { createMessage } from "@/app/db";
-import { streamText } from "ai";
+import {type Message, streamText} from 'ai';
+import {z} from 'zod';
+import {customModel} from '@/ai';
+import {auth} from '@/app/(auth)/auth';
+import {createMessage} from '@/app/db';
+
+function isMessage(item: unknown): item is Message {
+	return typeof item === 'object'
+		&& item !== null
+		&& 'role' in item
+		&& 'content' in item;
+}
+
+function isMessageArray(value: unknown): value is Message[] {
+	return Array.isArray(value) && value.every(item => isMessage(item));
+}
+
+const chatRequestSchema = z.object({
+	id: z.string(),
+	messages: z.custom<Message[]>(isMessageArray),
+	selectedFileIds: z.array(z.number()),
+});
 
 const system = `
 You are an expert researcher. Keep your responses concise and helpful.
@@ -25,36 +43,39 @@ IMPORTANT: Always format your response as follows:
 `;
 
 export async function POST(request: Request) {
-  const { id, messages, selectedFileIds } = await request.json();
+	const json: unknown = await request.json();
+	const {id, messages, selectedFileIds} = chatRequestSchema.parse(json);
 
-  const session = await auth();
+	const session = await auth();
 
-  if (!session) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+	if (!session?.user?.email) {
+		return new Response('Unauthorized', {status: 401});
+	}
 
-  const result = streamText({
-    model: customModel,
-    temperature: 0,
-    system,
-    messages,
-    experimental_providerMetadata: {
-      files: {
-        selection: selectedFileIds,
-      },
-    },
-    onFinish: async ({ text }) => {
-      await createMessage({
-        id,
-        messages: [...messages, { role: "assistant", content: text }],
-        author: session.user?.email!,
-      });
-    },
-    experimental_telemetry: {
-      isEnabled: true,
-      functionId: "stream-text",
-    },
-  });
+	const userEmail = session.user.email;
 
-  return result.toDataStreamResponse({});
+	const result = streamText({
+		model: customModel,
+		temperature: 0,
+		system,
+		messages,
+		experimental_providerMetadata: {
+			files: {
+				selection: selectedFileIds,
+			},
+		},
+		async onFinish({text}) {
+			await createMessage({
+				id,
+				messages: [...messages, {id, role: 'assistant' as const, content: text}],
+				author: userEmail,
+			});
+		},
+		experimental_telemetry: {
+			isEnabled: true,
+			functionId: 'stream-text',
+		},
+	});
+
+	return result.toDataStreamResponse({});
 }

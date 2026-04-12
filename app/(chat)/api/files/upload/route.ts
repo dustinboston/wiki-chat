@@ -1,73 +1,77 @@
-import { auth } from "@/app/(auth)/auth";
-import { createFile, deleteFileById, insertChunks } from "@/app/db";
-import { getPdfContentFromUrl } from "@/utils/pdf";
-import { openai } from "@ai-sdk/openai";
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
-import { del, put } from "@vercel/blob";
-import { embedMany } from "ai";
+import {openai} from '@ai-sdk/openai';
+import {RecursiveCharacterTextSplitter} from '@langchain/textsplitters';
+import {del, put} from '@vercel/blob';
+import {embedMany} from 'ai';
+import {getPdfContentFromUrl} from '@/utils/pdf';
+import {createFile, deleteFileById, insertChunks} from '@/app/db';
+import {auth} from '@/app/(auth)/auth';
 
 export async function POST(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const filename = searchParams.get("filename");
-  const titleParam = searchParams.get("title");
+	const {searchParams} = new URL(request.url);
+	const filename = searchParams.get('filename');
+	const titleParameter = searchParams.get('title');
 
-  const session = await auth();
+	if (!filename) {
+		return new Response('Missing filename parameter', {status: 400});
+	}
 
-  if (!session) {
-    return Response.redirect("/login");
-  }
+	const session = await auth();
 
-  const { user } = session;
+	if (!session) {
+		return Response.redirect('/login');
+	}
 
-  if (!user || !user.email) {
-    return Response.redirect("/login");
-  }
+	const {user} = session;
 
-  if (request.body === null) {
-    return new Response("Request body is empty", { status: 400 });
-  }
+	if (!user?.email) {
+		return Response.redirect('/login');
+	}
 
-  const contentType = request.headers.get("content-type") || "";
-  let content: string;
+	if (request.body === null) {
+		return new Response('Request body is empty', {status: 400});
+	}
 
-  if (contentType.includes("application/pdf")) {
-    const { downloadUrl, url } = await put(
-      `${user.email}/${filename}`,
-      request.body,
-      {
-        access: "public",
-      },
-    );
-    content = await getPdfContentFromUrl(downloadUrl);
-    await del(url);
-  } else {
-    content = await request.text();
-  }
+	const contentType = request.headers.get('content-type') ?? '';
+	let content: string;
 
-  const textSplitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 1000,
-  });
-  const chunkedContent = await textSplitter.createDocuments([content]);
+	if (contentType.includes('application/pdf')) {
+		const {downloadUrl, url} = await put(
+			`${user.email}/${filename}`,
+			request.body,
+			{
+				access: 'public',
+			},
+		);
+		content = await getPdfContentFromUrl(downloadUrl);
+		await del(url);
+	} else {
+		content = await request.text();
+	}
 
-  const { embeddings } = await embedMany({
-    model: openai.embedding("text-embedding-3-small"),
-    values: chunkedContent.map((chunk) => chunk.pageContent),
-  });
+	const textSplitter = new RecursiveCharacterTextSplitter({
+		chunkSize: 1000,
+	});
+	const chunkedContent = await textSplitter.createDocuments([content]);
 
-  const fileRecord = await createFile({
-    pathname: filename!,
-    title: titleParam || null,
-    userEmail: user.email,
-  });
+	const {embeddings} = await embedMany({
+		model: openai.embedding('text-embedding-3-small'),
+		values: chunkedContent.map(chunk => chunk.pageContent),
+	});
 
-  await insertChunks({
-    chunks: chunkedContent.map((chunk, i) => ({
-      id: `${fileRecord.id}/${i}`,
-      fileId: fileRecord.id,
-      content: chunk.pageContent,
-      embedding: embeddings[i],
-    })),
-  });
+	const fileRecord = await createFile({
+		pathname: filename,
+		title: titleParameter ?? null,
+		userEmail: user.email,
+	});
 
-  return Response.json({ id: fileRecord.id });
+	await insertChunks({
+		chunks: chunkedContent.map((chunk, i) => ({
+			id: `${fileRecord.id}/${i}`,
+			fileId: fileRecord.id,
+			content: chunk.pageContent,
+			embedding: embeddings[i],
+		})),
+	});
+
+	return Response.json({id: fileRecord.id});
 }

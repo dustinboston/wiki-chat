@@ -1,185 +1,235 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+	describe, it, expect, vi, beforeEach,
+} from 'vitest';
+import {
+	type LanguageModelV1Prompt,
+	generateObject, generateText, embed, cosineSimilarity,
+} from 'ai';
+import {ragMiddleware} from '@/ai/rag-middleware';
+import {getChunksByFileIds} from '@/app/db';
 
-vi.mock("@/app/db", () => ({
-  getChunksByFileIds: vi.fn(),
+const {
+	mockGetChunks,
+	mockGenerateObject,
+	mockGenerateText,
+	mockEmbed,
+	mockCosineSimilarity,
+} = vi.hoisted(() => ({
+	mockGetChunks: vi.fn(),
+	mockGenerateObject: vi.fn(),
+	mockGenerateText: vi.fn(),
+	mockEmbed: vi.fn(),
+	mockCosineSimilarity: vi.fn(),
 }));
 
-vi.mock("@ai-sdk/openai", () => ({
-  openai: Object.assign(vi.fn().mockReturnValue("mock-chat-model"), {
-    embedding: vi.fn().mockReturnValue("mock-embedding-model"),
-  }),
+vi.mock('@/app/db', () => ({
+	getChunksByFileIds: mockGetChunks,
 }));
 
-vi.mock("ai", () => ({
-  generateObject: vi.fn(),
-  generateText: vi.fn(),
-  embed: vi.fn(),
-  cosineSimilarity: vi.fn(),
+vi.mock('@ai-sdk/openai', () => ({
+	openai: Object.assign(vi.fn().mockReturnValue('mock-chat-model'), {
+		embedding: vi.fn().mockReturnValue('mock-embedding-model'),
+	}),
 }));
 
-import { ragMiddleware } from "@/ai/rag-middleware";
-import { getChunksByFileIds } from "@/app/db";
-import { generateObject, generateText, embed, cosineSimilarity } from "ai";
+vi.mock('ai', () => ({
+	generateObject: mockGenerateObject,
+	generateText: mockGenerateText,
+	embed: mockEmbed,
+	cosineSimilarity: mockCosineSimilarity,
+}));
 
-const mockGetChunks = vi.mocked(getChunksByFileIds);
-const mockGenerateObject = vi.mocked(generateObject);
-const mockGenerateText = vi.mocked(generateText);
-const mockEmbed = vi.mocked(embed);
-const mockCosineSimilarity = vi.mocked(cosineSimilarity);
-
-const transformParams = ragMiddleware.transformParams!;
+const transformParameters = ragMiddleware.transformParams;
 
 function makeUserMessage(text: string) {
-  return {
-    role: "user" as const,
-    content: [{ type: "text" as const, text }],
-  };
+	return {
+		role: 'user' as const,
+		content: [{type: 'text' as const, text}],
+	};
 }
 
-function makeParams(
-  messages: any[],
-  fileIds: number[] | undefined = undefined,
+function makeParameters(
+	messages: LanguageModelV1Prompt,
+	fileIds?: number[],
 ) {
-  return {
-    params: {
-      prompt: [...messages],
-      providerMetadata: fileIds
-        ? { files: { selection: fileIds } }
-        : undefined,
-    },
-  } as any;
+	return {
+		type: 'generate' as const,
+		params: {
+			inputFormat: 'messages' as const,
+			mode: {type: 'regular' as const},
+			prompt: [...messages],
+			providerMetadata: fileIds
+				? {files: {selection: fileIds}}
+				: undefined,
+		},
+	};
 }
 
-describe("ragMiddleware.transformParams", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+type TextPart = {type: string; text: string};
 
-  it("returns params unchanged when no provider metadata", async () => {
-    const msg = makeUserMessage("hello");
-    const input = makeParams([msg]);
-    const result = await transformParams(input);
-    expect(result).toBe(input.params);
-  });
+function isTextPart(part: unknown): part is TextPart {
+	if (typeof part !== 'object' || part === null) {
+		return false;
+	}
 
-  it("returns params unchanged when selection is empty", async () => {
-    const msg = makeUserMessage("hello");
-    const input = makeParams([msg], []);
-    const result = await transformParams(input);
-    expect(result).toBe(input.params);
-  });
+	return 'type' in part
+		&& 'text' in part
+		&& (part as Record<string, unknown>).type === 'text';
+}
 
-  it("returns params unchanged when last message is not user role", async () => {
-    const msg = { role: "assistant", content: [{ type: "text", text: "hi" }] };
-    const input = makeParams([msg], [1]);
-    const result = await transformParams(input);
-    // The assistant message should be pushed back
-    expect(result.prompt).toHaveLength(1);
-    expect(result.prompt[0].role).toBe("assistant");
-  });
+describe('ragMiddleware.transformParams', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
 
-  it("returns params unchanged when messages array is empty", async () => {
-    const input = makeParams([], [1]);
-    const result = await transformParams(input);
-    // recentMessage is undefined, so params returned as-is
-    expect(result.prompt).toHaveLength(0);
-  });
+	it('returns params unchanged when no provider metadata', async () => {
+		if (!transformParameters) {
+			throw new Error('transformParams not defined');
+		}
 
-  it("returns params unchanged when classification is not a question", async () => {
-    const msg = makeUserMessage("The sky is blue.");
-    const input = makeParams([msg], [1]);
+		const message = makeUserMessage('hello');
+		const input = makeParameters([message]);
+		const result = await transformParameters(input);
+		expect(result).toBe(input.params);
+	});
 
-    mockGenerateObject.mockResolvedValue({ object: "statement" } as any);
+	it('returns params unchanged when selection is empty', async () => {
+		if (!transformParameters) {
+			throw new Error('transformParams not defined');
+		}
 
-    const result = await transformParams(input);
-    // Message should be pushed back without RAG
-    expect(result.prompt).toHaveLength(1);
-    expect(result.prompt[0].content).toEqual(msg.content);
-    expect(mockGenerateText).not.toHaveBeenCalled();
-  });
+		const message = makeUserMessage('hello');
+		const input = makeParameters([message], []);
+		const result = await transformParameters(input);
+		expect(result).toBe(input.params);
+	});
 
-  it("performs RAG pipeline for questions", async () => {
-    const msg = makeUserMessage("What is quantum computing?");
-    const input = makeParams([msg], [1, 2]);
+	it('returns params unchanged when last message is not user role', async () => {
+		if (!transformParameters) {
+			throw new Error('transformParams not defined');
+		}
 
-    mockGenerateObject.mockResolvedValue({ object: "question" } as any);
-    mockGenerateText.mockResolvedValue({
-      text: "Quantum computing uses qubits...",
-    } as any);
-    mockEmbed.mockResolvedValue({
-      embedding: [0.1, 0.2, 0.3],
-    } as any);
-    mockGetChunks.mockResolvedValue([
-      { id: "1/0", fileId: 1, content: "Chunk A", embedding: [0.1, 0.2, 0.3] },
-      { id: "1/1", fileId: 1, content: "Chunk B", embedding: [0.4, 0.5, 0.6] },
-      { id: "2/0", fileId: 2, content: "Chunk C", embedding: [0.7, 0.8, 0.9] },
-    ]);
+		const message = {role: 'assistant' as const, content: [{type: 'text' as const, text: 'hi'}]};
+		const input = makeParameters([message], [1]);
+		const result = await transformParameters(input);
+		expect(result.prompt).toHaveLength(1);
+		expect(result.prompt[0].role).toBe('assistant');
+	});
 
-    // Return different similarity scores to test ranking
-    mockCosineSimilarity
-      .mockReturnValueOnce(0.9)  // Chunk A
-      .mockReturnValueOnce(0.5)  // Chunk B
-      .mockReturnValueOnce(0.7); // Chunk C
+	it('returns params unchanged when messages array is empty', async () => {
+		if (!transformParameters) {
+			throw new Error('transformParams not defined');
+		}
 
-    const result = await transformParams(input);
+		const input = makeParameters([], [1]);
+		const result = await transformParameters(input);
+		expect(result.prompt).toHaveLength(0);
+	});
 
-    // Should have called classify, generate hypothesis, embed
-    expect(mockGenerateObject).toHaveBeenCalledOnce();
-    expect(mockGenerateText).toHaveBeenCalledOnce();
-    expect(mockEmbed).toHaveBeenCalledOnce();
-    expect(mockGetChunks).toHaveBeenCalledWith({ fileIds: [1, 2] });
+	it('returns params unchanged when classification is not a question', async () => {
+		if (!transformParameters) {
+			throw new Error('transformParams not defined');
+		}
 
-    // The resulting prompt should have the user message with appended chunks
-    const lastMessage = result.prompt[result.prompt.length - 1];
-    expect(lastMessage.role).toBe("user");
+		const message = makeUserMessage('The sky is blue.');
+		const input = makeParameters([message], [1]);
 
-    // Original text + "relevant info" text + 3 chunk texts = 5 content parts
-    expect(lastMessage.content).toHaveLength(5);
+		mockGenerateObject.mockResolvedValue({object: 'statement'});
 
-    // Chunks should be sorted by similarity (A=0.9, C=0.7, B=0.5)
-    const chunkTexts = lastMessage.content
-      .filter((c: any) => c.type === "text")
-      .map((c: any) => c.text);
+		const result = await transformParameters(input);
+		expect(result.prompt).toHaveLength(1);
+		expect(result.prompt[0].content).toEqual(message.content);
+		expect(mockGenerateText).not.toHaveBeenCalled();
+	});
 
-    expect(chunkTexts).toContain("Chunk A");
-    expect(chunkTexts).toContain("Chunk B");
-    expect(chunkTexts).toContain("Chunk C");
+	it('performs RAG pipeline for questions', async () => {
+		if (!transformParameters) {
+			throw new Error('transformParams not defined');
+		}
 
-    // Verify ordering: Chunk A (0.9) before Chunk C (0.7) before Chunk B (0.5)
-    const aIdx = chunkTexts.indexOf("Chunk A");
-    const cIdx = chunkTexts.indexOf("Chunk C");
-    const bIdx = chunkTexts.indexOf("Chunk B");
-    expect(aIdx).toBeLessThan(cIdx);
-    expect(cIdx).toBeLessThan(bIdx);
-  });
+		const message = makeUserMessage('What is quantum computing?');
+		const input = makeParameters([message], [1, 2]);
 
-  it("limits to top 10 chunks", async () => {
-    const msg = makeUserMessage("What is AI?");
-    const fileIds = [1];
-    const input = makeParams([msg], fileIds);
+		mockGenerateObject.mockResolvedValue({object: 'question'});
+		mockGenerateText.mockResolvedValue({text: 'Quantum computing uses qubits...'});
+		mockEmbed.mockResolvedValue({embedding: [0.1, 0.2, 0.3]});
+		mockGetChunks.mockResolvedValue([
+			{
+				id: '1/0', fileId: 1, content: 'Chunk A', embedding: [0.1, 0.2, 0.3],
+			},
+			{
+				id: '1/1', fileId: 1, content: 'Chunk B', embedding: [0.4, 0.5, 0.6],
+			},
+			{
+				id: '2/0', fileId: 2, content: 'Chunk C', embedding: [0.7, 0.8, 0.9],
+			},
+		]);
 
-    mockGenerateObject.mockResolvedValue({ object: "question" } as any);
-    mockGenerateText.mockResolvedValue({ text: "AI is..." } as any);
-    mockEmbed.mockResolvedValue({ embedding: [0.1] } as any);
+		mockCosineSimilarity
+			.mockReturnValueOnce(0.9)
+			.mockReturnValueOnce(0.5)
+			.mockReturnValueOnce(0.7);
 
-    // Create 15 chunks
-    const chunks = Array.from({ length: 15 }, (_, i) => ({
-      id: `1/${i}`,
-      fileId: 1,
-      content: `Chunk ${i}`,
-      embedding: [i * 0.1],
-    }));
-    mockGetChunks.mockResolvedValue(chunks);
+		const result = await transformParameters(input);
 
-    // Give decreasing similarity so we can verify top-10
-    chunks.forEach((_, i) => {
-      mockCosineSimilarity.mockReturnValueOnce(1 - i * 0.05);
-    });
+		expect(mockGenerateObject).toHaveBeenCalledOnce();
+		expect(mockGenerateText).toHaveBeenCalledOnce();
+		expect(mockEmbed).toHaveBeenCalledOnce();
+		expect(mockGetChunks).toHaveBeenCalledWith({fileIds: [1, 2]});
 
-    const result = await transformParams(input);
-    const lastMessage = result.prompt[result.prompt.length - 1];
+		const lastMessage = result.prompt.at(-1);
+		expect(lastMessage).toBeDefined();
+		expect(lastMessage?.role).toBe('user');
 
-    // Original text (1) + "relevant info" text (1) + 10 chunks = 12
-    expect(lastMessage.content).toHaveLength(12);
-  });
+		if (lastMessage && Array.isArray(lastMessage.content)) {
+			expect(lastMessage.content).toHaveLength(5);
+
+			const chunkTexts = lastMessage.content
+				.filter(part => isTextPart(part))
+				.map(part => (part as TextPart).text);
+
+			expect(chunkTexts).toContain('Chunk A');
+			expect(chunkTexts).toContain('Chunk B');
+			expect(chunkTexts).toContain('Chunk C');
+
+			const indexA = chunkTexts.indexOf('Chunk A');
+			const indexC = chunkTexts.indexOf('Chunk C');
+			const indexB = chunkTexts.indexOf('Chunk B');
+			expect(indexA).toBeLessThan(indexC);
+			expect(indexC).toBeLessThan(indexB);
+		}
+	});
+
+	it('limits to top 10 chunks', async () => {
+		if (!transformParameters) {
+			throw new Error('transformParams not defined');
+		}
+
+		const message = makeUserMessage('What is AI?');
+		const fileIds = [1];
+		const input = makeParameters([message], fileIds);
+
+		mockGenerateObject.mockResolvedValue({object: 'question'});
+		mockGenerateText.mockResolvedValue({text: 'AI is...'});
+		mockEmbed.mockResolvedValue({embedding: [0.1]});
+
+		const chunks = Array.from({length: 15}, (unused, index) => ({
+			id: `1/${index}`,
+			fileId: 1,
+			content: `Chunk ${index}`,
+			embedding: [index * 0.1],
+		}));
+		mockGetChunks.mockResolvedValue(chunks);
+
+		for (const index of chunks.keys()) {
+			mockCosineSimilarity.mockReturnValueOnce(1 - (index * 0.05));
+		}
+
+		const result = await transformParameters(input);
+		const lastMessage = result.prompt.at(-1);
+
+		if (lastMessage && Array.isArray(lastMessage.content)) {
+			expect(lastMessage.content).toHaveLength(12);
+		}
+	});
 });

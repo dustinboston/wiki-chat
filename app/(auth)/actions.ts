@@ -1,50 +1,66 @@
-"use server";
+'use server';
 
-import { createUser, getUser } from "../db";
-import { signIn } from "./auth";
+import {createUser, getUser} from '../db';
+import {signIn, signOut} from './auth';
 
-export interface LoginActionState {
-  status: "idle" | "in_progress" | "success" | "failed";
+export async function logout(): Promise<void> {
+	await signOut();
 }
 
-export const login = async (
-  data: LoginActionState,
-  formData: FormData,
-): Promise<LoginActionState> => {
-  try {
-    await signIn("credentials", {
-      email: formData.get("email") as string,
-      password: formData.get("password") as string,
-      redirect: false,
-    });
-
-    return { status: "success" } as LoginActionState;
-  } catch {
-    return { status: "failed" } as LoginActionState;
-  }
+export type LoginActionState = {
+	status: 'idle' | 'in_progress' | 'success' | 'failed';
 };
 
-export interface RegisterActionState {
-  status: "idle" | "in_progress" | "success" | "failed" | "user_exists";
-}
+export const login = async (
+	data: LoginActionState,
+	formData: FormData,
+): Promise<LoginActionState> => {
+	try {
+		const email = formData.get('email');
+		const password = formData.get('password');
+
+		if (typeof email !== 'string' || typeof password !== 'string') {
+			return {status: 'failed'};
+		}
+
+		await signIn('credentials', {
+			email,
+			password,
+			redirect: false,
+		});
+
+		return {status: 'success'};
+	} catch {
+		return {status: 'failed'};
+	}
+};
+
+export type RegisterActionState = {
+	status: 'idle' | 'in_progress' | 'success' | 'failed' | 'user_exists';
+};
 
 export const register = async (
-  data: RegisterActionState,
-  formData: FormData,
-) => {
-  let email = formData.get("email") as string;
-  let password = formData.get("password") as string;
-  let user = await getUser(email);
+	data: RegisterActionState,
+	formData: FormData,
+): Promise<RegisterActionState> => {
+	const email = formData.get('email');
+	const password = formData.get('password');
 
-  if (user.length > 0) {
-    return { status: "user_exists" } as RegisterActionState;
-  } else {
-    await createUser(email, password);
-    await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
-    return { status: "success" } as RegisterActionState;
-  }
+	if (typeof email !== 'string' || typeof password !== 'string') {
+		return {status: 'failed'};
+	}
+
+	const existingUser = await getUser(email);
+
+	if (existingUser.length > 0) {
+		return {status: 'user_exists'};
+	}
+
+	await createUser(email, password);
+	await signIn('credentials', {
+		email,
+		password,
+		redirect: false,
+	});
+	return {status: 'success'};
 };

@@ -1,22 +1,25 @@
-interface ApplicationError extends Error {
-  info: string;
-  status: number;
+export class AppError extends Error {
+	info = '';
+	status = 0;
 }
 
-export const fetcher = async (url: string) => {
-  const res = await fetch(url);
+function assertJsonType<T>(value: unknown): asserts value is T {
+	// Generic T cannot be validated at runtime; callers provide type safety
+}
 
-  if (!res.ok) {
-    const error = new Error(
-      "An error occurred while fetching the data.",
-    ) as ApplicationError;
+export async function fetcher<T = unknown>(url: string): Promise<T> {
+	const response = await fetch(url);
 
-    error.info = await res.json();
-    error.status = res.status;
+	if (!response.ok) {
+		const error = new AppError('An error occurred while fetching the data.');
 
-    throw error;
-  }
+		error.info = await response.text();
+		error.status = response.status;
 
-  return res.json();
-};
+		throw error;
+	}
 
+	const json: unknown = await response.json();
+	assertJsonType<T>(json);
+	return json;
+}

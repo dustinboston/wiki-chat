@@ -1,8 +1,9 @@
-import NextAuth from "next-auth";
-import { authConfig } from "@/app/(auth)/auth.config";
+import nextAuth from 'next-auth';
+import {authConfig} from '@/app/(auth)/auth.config';
 
-export default NextAuth(authConfig).auth;
+const {auth} = nextAuth(authConfig);
+export default auth;
 
 export const config = {
-  matcher: ["/", "/:id", "/api/:path*", "/login", "/register"],
+	matcher: ['/', '/:id', '/api/:path*', '/login', '/register'],
 };

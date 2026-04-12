@@ -1,19 +1,23 @@
 {
-  "name": "ai-sdk-preview-internal-knowledge-base",
+  "name": "wiki-chat",
   "version": "0.1.0",
   "private": true,
   "license": "CC-BY-NC-4.0",
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "xo",
+    "lint:fix": "xo --fix",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "audit": "pnpm audit --audit-level=high",
+    "prepare": "husky"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.0.10",
@@ -31,12 +35,12 @@
     "drizzle-orm": "^0.33.0",
     "framer-motion": "^11.3.19",
     "fuse.js": "^7.3.0",
-    "next": "^15.6.0-canary.58",
+    "next": "^15.3.2",
     "next-auth": "5.0.0-beta.30",
     "pdf-parse": "^1.1.1",
     "postgres": "^3.4.4",
-    "react": "19.0.0-rc-7771d3a7-20240827",
-    "react-dom": "19.0.0-rc-7771d3a7-20240827",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
     "shiki": "^3.19.0",
     "sonner": "^1.5.0",
     "streamdown": "^1.6.7",
@@ -57,13 +61,17 @@
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "^4.1.4",
     "drizzle-kit": "^0.24.2",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.5",
+    "husky": "^9.1.7",
     "jsdom": "^29.0.2",
+    "lint-staged": "^16.4.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.15.7",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "xo": "^2.0.2"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": "xo --fix"
   }
 }
