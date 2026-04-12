@@ -4,7 +4,6 @@ import {
 	desc, eq, inArray, type InferInsertModel,
 } from 'drizzle-orm';
 import postgres from 'postgres';
-import {genSaltSync, hashSync} from 'bcrypt-ts';
 import {
 	chat, chunk, file, fileSource, user,
 	type FileSourceType,
@@ -27,11 +26,8 @@ export async function getUser(email: string) {
 	return getDb().select().from(user).where(eq(user.email, email));
 }
 
-export async function createUser(email: string, password: string) {
-	const salt = genSaltSync(10);
-	const hash = hashSync(password, salt);
-
-	return getDb().insert(user).values({email, password: hash});
+export async function createUser(email: string, hashedPassword: string) {
+	return getDb().insert(user).values({email, password: hashedPassword});
 }
 
 export async function createMessage({

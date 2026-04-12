@@ -1,5 +1,5 @@
 import {auth} from '@/app/(auth)/auth';
-import {deleteFileById, getFileById} from '@/app/db';
+import {deleteFile} from '@/services/file';
 
 export async function DELETE(request: Request) {
 	const {searchParams} = new URL(request.url);
@@ -27,12 +27,10 @@ export async function DELETE(request: Request) {
 		return new Response('Invalid file ID', {status: 400});
 	}
 
-	const file = await getFileById({id});
-	if (file?.userEmail !== user.email) {
+	const deleted = await deleteFile({id, userEmail: user.email});
+	if (!deleted) {
 		return new Response('File not found', {status: 404});
 	}
-
-	await deleteFileById({id});
 
 	return Response.json({});
 }

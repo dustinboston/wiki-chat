@@ -8,24 +8,22 @@ import {GET as getContent} from '@/app/(chat)/api/files/content/route';
 import {DELETE as deleteFile} from '@/app/(chat)/api/files/delete/route';
 
 const {
-	mockAuth, mockGetFilesByUser, mockGetFileById, mockGetChunksByFileIds, mockDeleteFileById,
+	mockAuth, mockListFiles, mockGetFileContent, mockDeleteFile,
 } = vi.hoisted(() => ({
 	mockAuth: vi.fn(),
-	mockGetFilesByUser: vi.fn(),
-	mockGetFileById: vi.fn(),
-	mockGetChunksByFileIds: vi.fn(),
-	mockDeleteFileById: vi.fn(),
+	mockListFiles: vi.fn(),
+	mockGetFileContent: vi.fn(),
+	mockDeleteFile: vi.fn(),
 }));
 
 vi.mock('@/app/(auth)/auth', () => ({
 	auth: mockAuth,
 }));
 
-vi.mock('@/app/db', () => ({
-	getFilesByUser: mockGetFilesByUser,
-	getFileById: mockGetFileById,
-	getChunksByFileIds: mockGetChunksByFileIds,
-	deleteFileById: mockDeleteFileById,
+vi.mock('@/services/file', () => ({
+	listFiles: mockListFiles,
+	getFileContent: mockGetFileContent,
+	deleteFile: mockDeleteFile,
 }));
 
 function mockSession(email: string): Session {
@@ -48,21 +46,25 @@ describe('GET /api/files/list', () => {
 	it('returns mapped file list for authenticated user', async () => {
 		const files = [
 			{
-				id: 1, pathname: 'doc.pdf', title: 'Doc', userEmail: 'a@b.com', createdAt: new Date(),
+				id: 1, pathname: 'doc.pdf', title: 'Doc', sourceType: 'upload', userEmail: 'a@b.com', createdAt: new Date(),
 			},
 			{
-				id: 2, pathname: 'notes.txt', title: null, userEmail: 'a@b.com', createdAt: new Date(),
+				id: 2, pathname: 'notes.txt', title: null, sourceType: 'upload', userEmail: 'a@b.com', createdAt: new Date(),
 			},
 		];
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
-		mockGetFilesByUser.mockResolvedValue(files);
+		mockListFiles.mockResolvedValue(files);
 
 		const response = await listFiles();
 		const body: unknown = await response.json();
 
 		expect(body).toEqual([
-			{id: 1, pathname: 'doc.pdf', title: 'Doc'},
-			{id: 2, pathname: 'notes.txt', title: null},
+			{
+				id: 1, pathname: 'doc.pdf', title: 'Doc', sourceType: 'upload',
+			},
+			{
+				id: 2, pathname: 'notes.txt', title: null, sourceType: 'upload',
+			},
 		]);
 	});
 });
@@ -98,35 +100,27 @@ describe('GET /api/files/content', () => {
 
 	it('returns 404 when file not found', async () => {
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
-		mockGetFileById.mockResolvedValue(undefined);
+		mockGetFileContent.mockResolvedValue(null);
 		const request = new Request('http://localhost/api/files/content?id=999');
-		const response = await getContent(request);
-		expect(response.status).toBe(404);
-	});
-
-	it('returns 404 when file belongs to another user', async () => {
-		mockAuth.mockResolvedValue(mockSession('a@b.com'));
-		mockGetFileById.mockResolvedValue({
-			id: 1, pathname: 'doc.pdf', title: null, userEmail: 'other@b.com', createdAt: new Date(),
-		});
-		const request = new Request('http://localhost/api/files/content?id=1');
 		const response = await getContent(request);
 		expect(response.status).toBe(404);
 	});
 
 	it('returns content from chunks', async () => {
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
-		mockGetFileById.mockResolvedValue({
-			id: 1, pathname: 'doc.pdf', title: null, userEmail: 'a@b.com', createdAt: new Date(),
+		mockGetFileContent.mockResolvedValue({
+			file: {
+				id: 1, pathname: 'doc.pdf', title: null, userEmail: 'a@b.com', createdAt: new Date(),
+			},
+			chunks: [
+				{
+					id: '1/0', fileId: 1, content: 'Hello', embedding: [],
+				},
+				{
+					id: '1/1', fileId: 1, content: 'World', embedding: [],
+				},
+			],
 		});
-		mockGetChunksByFileIds.mockResolvedValue([
-			{
-				id: '1/0', fileId: 1, content: 'Hello', embedding: [],
-			},
-			{
-				id: '1/1', fileId: 1, content: 'World', embedding: [],
-			},
-		]);
 
 		const request = new Request('http://localhost/api/files/content?id=1');
 		const response = await getContent(request);
@@ -138,16 +132,18 @@ describe('GET /api/files/content', () => {
 
 	it('truncates content exceeding 5000 words', async () => {
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
-		mockGetFileById.mockResolvedValue({
-			id: 1, pathname: 'doc.pdf', title: null, userEmail: 'a@b.com', createdAt: new Date(),
-		});
 
 		const longContent = Array.from({length: 5500}, (unused, index) => `word${index}`).join(' ');
-		mockGetChunksByFileIds.mockResolvedValue([
-			{
-				id: '1/0', fileId: 1, content: longContent, embedding: [],
+		mockGetFileContent.mockResolvedValue({
+			file: {
+				id: 1, pathname: 'doc.pdf', title: null, userEmail: 'a@b.com', createdAt: new Date(),
 			},
-		]);
+			chunks: [
+				{
+					id: '1/0', fileId: 1, content: longContent, embedding: [],
+				},
+			],
+		});
 
 		const request = new Request('http://localhost/api/files/content?id=1');
 		const response = await getContent(request);
@@ -195,22 +191,10 @@ describe('DELETE /api/files/delete', () => {
 		expect(response.status).toBe(400);
 	});
 
-	it('returns 404 when file not found', async () => {
+	it('returns 404 when file not found or belongs to another user', async () => {
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
-		mockGetFileById.mockResolvedValue(undefined);
+		mockDeleteFile.mockResolvedValue(null);
 		const request = new Request('http://localhost/api/files/delete?id=99', {
-			method: 'DELETE',
-		});
-		const response = await deleteFile(request);
-		expect(response.status).toBe(404);
-	});
-
-	it('returns 404 when file belongs to another user', async () => {
-		mockAuth.mockResolvedValue(mockSession('a@b.com'));
-		mockGetFileById.mockResolvedValue({
-			id: 1, pathname: 'doc.pdf', title: null, userEmail: 'other@b.com', createdAt: new Date(),
-		});
-		const request = new Request('http://localhost/api/files/delete?id=1', {
 			method: 'DELETE',
 		});
 		const response = await deleteFile(request);
@@ -219,10 +203,9 @@ describe('DELETE /api/files/delete', () => {
 
 	it('deletes file and returns empty object on success', async () => {
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
-		mockGetFileById.mockResolvedValue({
+		mockDeleteFile.mockResolvedValue({
 			id: 1, pathname: 'doc.pdf', title: null, userEmail: 'a@b.com', createdAt: new Date(),
 		});
-		mockDeleteFileById.mockResolvedValue(undefined);
 
 		const request = new Request('http://localhost/api/files/delete?id=1', {
 			method: 'DELETE',
@@ -230,7 +213,7 @@ describe('DELETE /api/files/delete', () => {
 		const response = await deleteFile(request);
 		const body: unknown = await response.json();
 
-		expect(mockDeleteFileById).toHaveBeenCalledWith({id: 1});
+		expect(mockDeleteFile).toHaveBeenCalledWith({id: 1, userEmail: 'a@b.com'});
 		expect(body).toEqual({});
 	});
 });

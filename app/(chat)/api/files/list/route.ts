@@ -1,5 +1,5 @@
 import {auth} from '@/app/(auth)/auth';
-import {getFilesByUser} from '@/app/db';
+import {listFiles} from '@/services/file';
 
 export async function GET() {
 	const session = await auth();
@@ -14,7 +14,7 @@ export async function GET() {
 		return Response.redirect('/login');
 	}
 
-	const files = await getFilesByUser({email: user.email});
+	const files = await listFiles({email: user.email});
 
 	return Response.json(files.map(f => ({
 		id: f.id,

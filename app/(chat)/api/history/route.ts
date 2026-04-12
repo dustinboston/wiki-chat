@@ -1,5 +1,5 @@
 import {auth} from '@/app/(auth)/auth';
-import {deleteChatById, getChatById, getChatsByUser} from '@/app/db';
+import {listChats, deleteChat} from '@/services/chat';
 
 export async function GET() {
 	const session = await auth();
@@ -8,7 +8,7 @@ export async function GET() {
 		return Response.json('Unauthorized!', {status: 401});
 	}
 
-	const chats = await getChatsByUser({email: session.user.email!});
+	const chats = await listChats({email: session.user.email!});
 	return Response.json(chats);
 }
 
@@ -27,12 +27,10 @@ export async function DELETE(request: Request) {
 		return new Response('Chat ID not provided', {status: 400});
 	}
 
-	const chat = await getChatById({id});
-	if (!chat || chat.author !== session.user.email) {
+	const deleted = await deleteChat({id, userEmail: session.user.email!});
+	if (!deleted) {
 		return new Response('Chat not found', {status: 404});
 	}
-
-	await deleteChatById({id});
 
 	return Response.json({});
 }

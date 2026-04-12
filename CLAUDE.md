@@ -19,8 +19,9 @@ Wiki Chat is a RAG (Retrieval-Augmented Generation) chat app. Users upload PDF/t
 app/            Next.js App Router pages and API routes
   (auth)/       Auth pages (login, register) and NextAuth config
   (chat)/       Chat UI and API routes (/api/chat, /api/files, /api/history)
-  db.ts         Database access functions
+  db.ts         Database repository functions (pure data access)
   env.ts        Zod-validated environment variables
+services/       Business logic layer (auth, chat, file)
 ai/             RAG retrieval (rag.ts) and model config (index.ts)
 components/     React components (sidebar, navbar, chat, file viewer)
 schema.ts       Drizzle ORM table definitions
@@ -60,7 +61,8 @@ Create `.env.local` with these values for local development.
 ## Key Patterns
 
 - **RAG pipeline** is in `ai/rag.ts` — classifies messages, generates hypothetical answers (HyDE), retrieves chunks by cosine similarity, then augments the prompt. Returns source chunk metadata for provenance tracking.
-- **Database functions** are in `app/db.ts` — all DB access goes through this module.
+- **Service layer** in `services/` — business logic (auth, chat, file). Route handlers and pages call services; services call `app/db.ts`.
+- **Database repository** is `app/db.ts` — pure data access, no business logic.
 - **Schema** is in `schema.ts` — tables: User, Chat, File, Chunk, FileSource.
 - **Migrations** live in `drizzle/` and are generated via `pnpm db:generate`.
 - The `@/*` path alias maps to the project root.

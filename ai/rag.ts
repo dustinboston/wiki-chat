@@ -7,7 +7,7 @@ import {
 	type CoreMessage,
 } from 'ai';
 import {z} from 'zod';
-import {getChunksByFileIds} from '@/app/db';
+import {getChunksByFileIds} from '@/services/file';
 
 export type SourceChunk = {
 	chunkId: string;

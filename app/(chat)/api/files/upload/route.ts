@@ -4,9 +4,7 @@ import {del, put} from '@vercel/blob';
 import {embedMany} from 'ai';
 import {z} from 'zod';
 import {getPdfContentFromUrl} from '@/utils/pdf';
-import {
-	createFile, insertChunks, insertFileSources,
-} from '@/app/db';
+import {createFileWithChunks} from '@/services/file';
 import {auth} from '@/app/(auth)/auth';
 import type {FileSourceType} from '@/schema';
 
@@ -83,32 +81,17 @@ export async function POST(request: Request) {
 		values: chunkedContent.map(chunk => chunk.pageContent),
 	});
 
-	const fileRecord = await createFile({
+	const fileRecord = await createFileWithChunks({
 		pathname: filename,
 		title: titleParameter ?? null,
 		userEmail: user.email,
 		sourceType,
-	});
-
-	await insertChunks({
 		chunks: chunkedContent.map((chunk, i) => ({
-			id: `${fileRecord.id}/${i}`,
-			fileId: fileRecord.id,
 			content: chunk.pageContent,
 			embedding: embeddings[i],
 		})),
+		sourceChunks,
 	});
-
-	// Record provenance for generated files
-	if (sourceChunks.length > 0) {
-		await insertFileSources({
-			sources: sourceChunks.map(sc => ({
-				fileId: fileRecord.id,
-				sourceChunkId: sc.chunkId,
-				similarity: sc.similarity,
-			})),
-		});
-	}
 
 	return Response.json({id: fileRecord.id});
 }

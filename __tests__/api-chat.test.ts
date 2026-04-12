@@ -4,10 +4,10 @@ import {
 import {type Session} from 'next-auth';
 import {POST as postChat} from '@/app/(chat)/api/chat/route';
 
-const {mockAuth, mockStreamText, mockCreateMessage, mockRetrieveAndAugment, mockCreateDataStreamResponse} = vi.hoisted(() => ({
+const {mockAuth, mockStreamText, mockSaveMessage, mockRetrieveAndAugment, mockCreateDataStreamResponse} = vi.hoisted(() => ({
 	mockAuth: vi.fn(),
 	mockStreamText: vi.fn(),
-	mockCreateMessage: vi.fn(),
+	mockSaveMessage: vi.fn(),
 	mockRetrieveAndAugment: vi.fn(),
 	mockCreateDataStreamResponse: vi.fn(),
 }));
@@ -16,8 +16,8 @@ vi.mock('@/app/(auth)/auth', () => ({
 	auth: mockAuth,
 }));
 
-vi.mock('@/app/db', () => ({
-	createMessage: mockCreateMessage.mockResolvedValue(undefined),
+vi.mock('@/services/chat', () => ({
+	saveMessage: mockSaveMessage.mockResolvedValue(undefined),
 }));
 
 vi.mock('@/ai/rag', () => ({
@@ -137,7 +137,7 @@ describe('POST /api/chat', () => {
 			await capturedOnFinish({text: 'AI response'});
 		}
 
-		expect(mockCreateMessage).toHaveBeenCalledWith({
+		expect(mockSaveMessage).toHaveBeenCalledWith({
 			id: 'chat-1',
 			messages: [...messages, {
 				id: 'chat-1',

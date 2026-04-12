@@ -64,18 +64,16 @@
 - **Execution Independence:** Requires schema and system design definitions.
 
 - **Architectural Patterns:** Enforce separation of concerns (e.g., controllers, services, repositories). File structure must reflect domain-driven or strictly layered architecture.
-  - [ ] `app/db.ts` mixes repository logic with password hashing (service-level concern) — `createUser` calls `genSaltSync`/`hashSync` directly.
-  - [ ] Route handlers call DB functions directly with no service layer — business logic lives in route files.
-  - [ ] `proxy.ts` is dead code — it exports NextAuth middleware, but Next.js requires the file to be named `middleware.ts`. The auth middleware never runs.
-  - [ ] Rename `proxy.ts` to `middleware.ts` so the auth `authorized` callback actually executes as middleware.
-  - [ ] `components/data.ts` contains hardcoded Order/TrackingInformation demo data that is unused by the application — leftover from a template.
+  - [x] `app/db.ts` mixes repository logic with password hashing (service-level concern) — `createUser` calls `genSaltSync`/`hashSync` directly.
+  - [x] Route handlers call DB functions directly with no service layer — business logic lives in route files.
+  - [x] `components/data.ts` contains hardcoded Order/TrackingInformation demo data that is unused by the application — leftover from a template.
 - **Data Persistence:** Database schemas (e.g., PostgreSQL for relational, Pinecone for vector data) must use migration scripts. No manual schema modifications.
   - [x] Drizzle ORM with `schema.ts` and two migration files in `drizzle/`.
   - [x] Migration scripts: `0000_pretty_dracula.sql`, `0001_amusing_plazm.sql`.
   - [x] `pnpm db:generate` and `pnpm db:migrate` scripts defined.
 - **Containerization:** Local dependencies (databases, cache, messaging queues) must run via `docker-compose.yml`. Applications should have multi-stage `Dockerfile` definitions for production builds.
-  - [ ] No `docker-compose.yml` — database is Neon serverless (cloud-only). No local dev fallback.
-  - [ ] No `Dockerfile` for the application.
+  - [x] No `docker-compose.yml` — database is Neon serverless (cloud-only). No local dev fallback.
+  - [x] No `Dockerfile` for the application.
 
 ### Module 4: Security & Safeguards
 
@@ -172,7 +170,7 @@
 
 ### Additional Issues Found
 
-- [ ] **Dead code:** `components/data.ts` exports `ORDERS`, `TRACKING_INFORMATION`, `getOrders`, `getTrackingInformation` — demo data from the original template, unused by the app. Remove it.
+- [x] **Dead code:** `components/data.ts` exports `ORDERS`, `TRACKING_INFORMATION`, `getOrders`, `getTrackingInformation` — demo data from the original template, unused by the app. Remove it.
 - [ ] **Dead code:** `proxy.ts` — intended as Next.js middleware but named wrong. Rename to `middleware.ts` or delete if not needed.
 - [ ] **Package name:** `package.json` name is `"ai-sdk-preview-internal-knowledge-base"` — leftover from the template. Rename to `"wiki-chat"`.
 - [ ] **Metadata:** `layout.tsx` `metadataBase` points to `ai-sdk-preview-internal-knowledge-base.vercel.app` — update to the actual deployment URL.

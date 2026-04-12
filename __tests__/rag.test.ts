@@ -5,7 +5,7 @@ import {
 	generateObject, generateText, embed, cosineSimilarity,
 } from 'ai';
 import {retrieveAndAugment} from '@/ai/rag';
-import {getChunksByFileIds} from '@/app/db';
+import {getChunksByFileIds} from '@/services/file';
 
 const {
 	mockGetChunks,
@@ -21,7 +21,7 @@ const {
 	mockCosineSimilarity: vi.fn(),
 }));
 
-vi.mock('@/app/db', () => ({
+vi.mock('@/services/file', () => ({
 	getChunksByFileIds: mockGetChunks,
 }));
 

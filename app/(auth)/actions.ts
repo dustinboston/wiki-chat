@@ -1,7 +1,7 @@
 'use server';
 
-import {createUser, getUser} from '../db';
 import {signIn, signOut} from './auth';
+import {createUser, getUser} from '@/services/auth';
 
 export async function logout(): Promise<void> {
 	await signOut();

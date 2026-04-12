@@ -7,7 +7,7 @@ import {
 import {z} from 'zod';
 import {openai} from '@ai-sdk/openai';
 import {auth} from '@/app/(auth)/auth';
-import {createMessage} from '@/app/db';
+import {saveMessage} from '@/services/chat';
 import {retrieveAndAugment, type SourceChunk} from '@/ai/rag';
 
 function isMessage(item: unknown): item is Message {
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
 				system,
 				messages: augmentedMessages,
 				async onFinish({text}) {
-					await createMessage({
+					await saveMessage({
 						id,
 						messages: [
 							...messages,

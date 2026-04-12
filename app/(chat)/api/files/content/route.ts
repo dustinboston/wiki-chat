@@ -1,5 +1,5 @@
 import {auth} from '@/app/(auth)/auth';
-import {getChunksByFileIds, getFileById} from '@/app/db';
+import {getFileContent} from '@/services/file';
 
 const WORD_LIMIT = 5000;
 
@@ -29,14 +29,12 @@ export async function GET(request: Request) {
 		return new Response('Invalid file ID', {status: 400});
 	}
 
-	const file = await getFileById({id});
-	if (file?.userEmail !== user.email) {
+	const result = await getFileContent({id, userEmail: user.email});
+	if (!result) {
 		return new Response('File not found', {status: 404});
 	}
 
-	const chunks = await getChunksByFileIds({fileIds: [id]});
-
-	let fullContent = chunks.map(chunk => chunk.content).join('\n\n');
+	let fullContent = result.chunks.map(chunk => chunk.content).join('\n\n');
 
 	const words = fullContent.split(/\s+/v);
 	const truncated = words.length > WORD_LIMIT;
