@@ -9,6 +9,7 @@ import {
 	json,
 	serial,
 	integer,
+	vector,
 } from 'drizzle-orm/pg-core';
 
 export type AuditAction = 'delete_chat' | 'delete_file';
@@ -48,7 +49,7 @@ export const chunk = pgTable('Chunk', {
 		.notNull()
 		.references(() => file.id),
 	content: text('content').notNull(),
-	embedding: real('embedding').array().notNull(),
+	embedding: vector('embedding', {dimensions: 1536}).notNull(),
 });
 
 export const fileSource = pgTable('FileSource', {

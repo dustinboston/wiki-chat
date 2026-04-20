@@ -4,17 +4,11 @@ import {listFiles} from '@/services/file';
 export async function GET() {
 	const session = await auth();
 
-	if (!session) {
-		return Response.redirect('/login');
+	if (!session?.user?.email) {
+		return new Response('Unauthorized', {status: 401});
 	}
 
-	const {user} = session;
-
-	if (!user?.email) {
-		return Response.redirect('/login');
-	}
-
-	const files = await listFiles({email: user.email});
+	const files = await listFiles({email: session.user.email});
 
 	return Response.json(files.map(f => ({
 		id: f.id,

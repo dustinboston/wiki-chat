@@ -16,8 +16,43 @@ type MessageProps = {
 	role: string;
 	content: string;
 	sources?: AggregatedSource[];
-	onSaveMessage: (index: number) => void;
+	isStreaming?: boolean;
+	onSaveMessage: (index: number) => Promise<boolean>;
 };
+
+type SaveStatus = 'idle' | 'loading' | 'done';
+
+function SaveToLibraryButton({id, onSaveMessage}: {
+	id: number;
+	onSaveMessage: (index: number) => Promise<boolean>;
+}) {
+	const [status, setStatus] = useState<SaveStatus>('idle');
+
+	const label = status === 'loading' ? 'Saving…' : (status === 'done' ? 'Saved' : 'Add to Library');
+
+	const handleClick = async () => {
+		if (status !== 'idle') {
+			return;
+		}
+
+		setStatus('loading');
+		const success = await onSaveMessage(id);
+		setStatus(success ? 'done' : 'idle');
+	};
+
+	return (
+		<button
+			onClick={() => {
+				void handleClick();
+			}}
+			type='button'
+			disabled={status !== 'idle'}
+			className='bg-zinc-800 hover:bg-zinc-700 text-zinc-50 text-xs px-2 py-1 rounded-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-zinc-800'
+		>
+			{label}
+		</button>
+	);
+}
 
 function SourcesList({sources}: {sources: AggregatedSource[]}) {
 	const [isExpanded, setIsExpanded] = useState(false);
@@ -52,7 +87,7 @@ function SourcesList({sources}: {sources: AggregatedSource[]}) {
 	);
 }
 
-export const Message = ({id, role, content, sources = [], onSaveMessage}: MessageProps) => (
+export const Message = ({id, role, content, sources = [], isStreaming = false, onSaveMessage}: MessageProps) => (
 	<motion.div
 		className={'flex flex-row gap-4 px-4 mb-2 pb-5 w-full md:w-[500px] md:px-0 first-of-type:pt-20 border-b border-gray-800'}
 		initial={{y: 5, opacity: 0}}
@@ -70,17 +105,11 @@ export const Message = ({id, role, content, sources = [], onSaveMessage}: Messag
 			{role === 'assistant' && (
 				<div className='flex flex-col gap-2'>
 					<SourcesList sources={sources} />
-					<form className='text-right'>
-						<button
-							onClick={() => {
-								onSaveMessage(id);
-							}}
-							type='button'
-							className='bg-zinc-800 text-zinc-50 text-xs px-2 py-1 rounded-sm'
-						>
-							Add to Library
-						</button>
-					</form>
+					{!isStreaming && (
+						<form className='text-right'>
+							<SaveToLibraryButton id={id} onSaveMessage={onSaveMessage} />
+						</form>
+					)}
 				</div>
 			)}
 		</div>

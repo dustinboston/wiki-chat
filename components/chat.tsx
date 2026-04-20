@@ -112,16 +112,17 @@ export function Chat({
 	const [messagesContainerRef, messagesEndRef]
 		= useScrollToBottom<HTMLDivElement>();
 
-	const onSaveMessage = async (index: number) => {
+	const onSaveMessage = async (index: number): Promise<boolean> => {
 		const message = messages[index];
 		const {title, body} = parseTitle(message.content);
 		const filename = `${(title ?? 'Message').replaceAll(/[^a-zA-Z\d\s]/gv, '').trim()} ${Date.now()}.md`;
 		const sources = getMessageSources(message);
-		await uploadFile(filename, body, {
+		const result = await uploadFile(filename, body, {
 			title: title || undefined,
 			sourceType: 'generated',
 			sourceChunks: sources.length > 0 ? sources : undefined,
 		});
+		return result !== null;
 	};
 
 	return (
@@ -142,9 +143,8 @@ export function Chat({
 									: message.content
 							}
 							sources={message.role === 'assistant' ? aggregateSources(getMessageSources(message), fileMap) : []}
-							onSaveMessage={(index: number) => {
-								void onSaveMessage(index);
-							}}
+							isStreaming={isLoading && index === messages.length - 1 && message.role === 'assistant'}
+							onSaveMessage={onSaveMessage}
 						/>
 					))}
 					<div

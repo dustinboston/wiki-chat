@@ -1,13 +1,11 @@
 import {openai} from '@ai-sdk/openai';
 import {
-	cosineSimilarity,
 	embed,
 	generateObject,
 	generateText,
 	type CoreMessage,
 } from 'ai';
-import {z} from 'zod';
-import {getChunksByFileIds} from '@/services/file';
+import {getTopChunksForFileIds} from '@/services/file';
 
 export type SourceChunk = {
 	chunkId: string;
@@ -50,7 +48,6 @@ export async function retrieveAndAugment({
 				.map(part => part.text)
 				.join('\n');
 
-	// Classify the user prompt as whether it requires more context or not
 	const {object: classification} = await generateObject({
 		model: openai('gpt-4o-mini', {structuredOutputs: true}),
 		output: 'enum',
@@ -59,13 +56,11 @@ export async function retrieveAndAugment({
 		prompt: lastUserMessageContent,
 	});
 
-	// Only use RAG for questions
 	if (classification !== 'question') {
 		augmented.push(recentMessage);
 		return {messages: augmented, sources: []};
 	}
 
-	// Use hypothetical document embeddings (HyDE)
 	const {text: hypotheticalAnswer} = await generateText({
 		model: openai('gpt-4o-mini', {structuredOutputs: true}),
 		system: 'Answer the users question:',
@@ -77,21 +72,12 @@ export async function retrieveAndAugment({
 		value: hypotheticalAnswer,
 	});
 
-	const chunksBySelection = await getChunksByFileIds({fileIds});
+	const topKChunks = await getTopChunksForFileIds({
+		fileIds,
+		queryEmbedding: hypotheticalAnswerEmbedding,
+		limit: 10,
+	});
 
-	const chunksWithSimilarity = chunksBySelection.map(chunk => ({
-		...chunk,
-		similarity: cosineSimilarity(
-			hypotheticalAnswerEmbedding,
-			chunk.embedding,
-		),
-	}));
-
-	chunksWithSimilarity.sort((a, b) => b.similarity - a.similarity);
-	const k = 10;
-	const topKChunks = chunksWithSimilarity.slice(0, k);
-
-	// Build augmented messages with context
 	augmented.push({
 		role: 'user',
 		content: [

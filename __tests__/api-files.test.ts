@@ -33,14 +33,16 @@ function mockSession(email: string): Session {
 describe('GET /api/files/list', () => {
 	beforeEach(() => vi.clearAllMocks());
 
-	it('redirects when not authenticated', async () => {
+	it('returns 401 when not authenticated', async () => {
 		mockAuth.mockResolvedValue(null);
-		await expect(listFiles()).rejects.toThrow();
+		const response = await listFiles();
+		expect(response.status).toBe(401);
 	});
 
-	it('redirects when user has no email', async () => {
+	it('returns 401 when user has no email', async () => {
 		mockAuth.mockResolvedValue({expires: ''});
-		await expect(listFiles()).rejects.toThrow();
+		const response = await listFiles();
+		expect(response.status).toBe(401);
 	});
 
 	it('returns mapped file list for authenticated user', async () => {

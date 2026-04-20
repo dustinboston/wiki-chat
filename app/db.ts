@@ -1,7 +1,7 @@
 import {type Message} from 'ai';
 import {drizzle, type PostgresJsDatabase} from 'drizzle-orm/postgres-js';
 import {
-	and, desc, eq, inArray, isNull, type InferInsertModel,
+	and, cosineDistance, desc, eq, inArray, isNull, sql, type InferInsertModel,
 } from 'drizzle-orm';
 import postgres from 'postgres';
 import {
@@ -118,6 +118,29 @@ export async function getChunksByFileIds({
 		.select()
 		.from(chunk)
 		.where(inArray(chunk.fileId, fileIds));
+}
+
+export async function getTopChunksForFileIds({
+	fileIds,
+	queryEmbedding,
+	limit,
+}: {
+	fileIds: number[];
+	queryEmbedding: number[];
+	limit: number;
+}) {
+	const distance = cosineDistance(chunk.embedding, queryEmbedding);
+	return getDb()
+		.select({
+			id: chunk.id,
+			fileId: chunk.fileId,
+			content: chunk.content,
+			similarity: sql<number>`1 - (${distance})`,
+		})
+		.from(chunk)
+		.where(inArray(chunk.fileId, fileIds))
+		.orderBy(distance)
+		.limit(limit);
 }
 
 export async function getFilesByUser({email}: {email: string}) {

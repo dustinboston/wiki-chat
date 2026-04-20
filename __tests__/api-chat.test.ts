@@ -4,12 +4,13 @@ import {
 import {type Session} from 'next-auth';
 import {POST as postChat} from '@/app/(chat)/api/chat/route';
 
-const {mockAuth, mockStreamText, mockSaveMessage, mockRetrieveAndAugment, mockCreateDataStreamResponse} = vi.hoisted(() => ({
+const {mockAuth, mockStreamText, mockSaveMessage, mockRetrieveAndAugment, mockCreateDataStreamResponse, mockListFiles} = vi.hoisted(() => ({
 	mockAuth: vi.fn(),
 	mockStreamText: vi.fn(),
 	mockSaveMessage: vi.fn(),
 	mockRetrieveAndAugment: vi.fn(),
 	mockCreateDataStreamResponse: vi.fn(),
+	mockListFiles: vi.fn(),
 }));
 
 vi.mock('@/app/(auth)/auth', () => ({
@@ -18,6 +19,10 @@ vi.mock('@/app/(auth)/auth', () => ({
 
 vi.mock('@/services/chat', () => ({
 	saveMessage: mockSaveMessage.mockResolvedValue(undefined),
+}));
+
+vi.mock('@/services/file', () => ({
+	listFiles: mockListFiles,
 }));
 
 vi.mock('@/ai/rag', () => ({
@@ -42,6 +47,7 @@ describe('POST /api/chat', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mockRetrieveAndAugment.mockResolvedValue({messages: [], sources: []});
+		mockListFiles.mockResolvedValue([]);
 		mockCreateDataStreamResponse.mockImplementation(({execute}: {execute: (ds: Record<string, unknown>) => void}) => {
 			const mockDataStream = {
 				writeMessageAnnotation: vi.fn(),
@@ -102,6 +108,51 @@ describe('POST /api/chat', () => {
 		expect(mockStreamText).toHaveBeenCalledWith(expect.objectContaining({
 			temperature: 0,
 			messages: augmentedMessages,
+		}));
+	});
+
+	it('falls back to all user files when selectedFileIds is empty', async () => {
+		mockAuth.mockResolvedValue(mockSession('a@b.com'));
+		mockListFiles.mockResolvedValue([{id: 7}, {id: 9}]);
+		mockStreamText.mockReturnValue({mergeIntoDataStream: vi.fn()});
+
+		const request = new Request('http://localhost/api/chat', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({
+				id: 'chat-1',
+				messages: [{role: 'user', content: 'hi'}],
+				selectedFileIds: [],
+			}),
+		});
+
+		await postChat(request);
+
+		expect(mockListFiles).toHaveBeenCalledWith({email: 'a@b.com'});
+		expect(mockRetrieveAndAugment).toHaveBeenCalledWith(expect.objectContaining({
+			fileIds: [7, 9],
+		}));
+	});
+
+	it('does not call listFiles when selectedFileIds is non-empty', async () => {
+		mockAuth.mockResolvedValue(mockSession('a@b.com'));
+		mockStreamText.mockReturnValue({mergeIntoDataStream: vi.fn()});
+
+		const request = new Request('http://localhost/api/chat', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({
+				id: 'chat-1',
+				messages: [{role: 'user', content: 'hi'}],
+				selectedFileIds: [3],
+			}),
+		});
+
+		await postChat(request);
+
+		expect(mockListFiles).not.toHaveBeenCalled();
+		expect(mockRetrieveAndAugment).toHaveBeenCalledWith(expect.objectContaining({
+			fileIds: [3],
 		}));
 	});
 

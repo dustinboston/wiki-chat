@@ -9,6 +9,7 @@ import {
 	insertAuditLog,
 	getSourcesByFileId,
 	getDerivedFilesByFileId,
+	getTopChunksForFileIds,
 } from '@/app/db';
 import type {FileSourceType} from '@/schema';
 
@@ -129,4 +130,4 @@ export async function getFileSources({id, userEmail}: {id: number; userEmail: st
 	};
 }
 
-export {getChunksByFileIds} from '@/app/db';
+export {getChunksByFileIds, getTopChunksForFileIds} from '@/app/db';

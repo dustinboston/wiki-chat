@@ -8,7 +8,8 @@ import {z} from 'zod';
 import {openai} from '@ai-sdk/openai';
 import {auth} from '@/app/(auth)/auth';
 import {saveMessage} from '@/services/chat';
-import {retrieveAndAugment, type SourceChunk} from '@/ai/rag';
+import {listFiles} from '@/services/file';
+import {retrieveAndAugment} from '@/ai/rag';
 
 function isMessage(item: unknown): item is Message {
 	return typeof item === 'object'
@@ -48,6 +49,11 @@ IMPORTANT: Always format your response as follows:
 - Line 3 onward is the actual response content. Four paragraphs or less.
 `;
 
+/**
+ *
+ * @param request Converts the messsages and selectedFileIds into a
+ * @returns a Response data stream
+ */
 export async function POST(request: Request) {
 	const json: unknown = await request.json();
 	const {id, messages, selectedFileIds} = chatRequestSchema.parse(json);
@@ -60,10 +66,17 @@ export async function POST(request: Request) {
 
 	const userEmail = session.user.email;
 
+	// When no files are explicitly selected, query across all of the user's files.
+	let fileIds = selectedFileIds;
+	if (fileIds.length === 0) {
+		const userFiles = await listFiles({email: userEmail});
+		fileIds = userFiles.map(f => f.id);
+	}
+
 	// Run RAG retrieval to get augmented messages and source chunks
 	const {messages: augmentedMessages, sources} = await retrieveAndAugment({
 		messages: convertToCoreMessages(messages),
-		fileIds: selectedFileIds,
+		fileIds,
 	});
 
 	return createDataStreamResponse({

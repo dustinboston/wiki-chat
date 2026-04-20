@@ -1,28 +1,22 @@
 import {
 	describe, it, expect, vi, beforeEach,
 } from 'vitest';
-import {
-	generateObject, generateText, embed, cosineSimilarity,
-} from 'ai';
 import {retrieveAndAugment} from '@/ai/rag';
-import {getChunksByFileIds} from '@/services/file';
 
 const {
-	mockGetChunks,
+	mockGetTopChunks,
 	mockGenerateObject,
 	mockGenerateText,
 	mockEmbed,
-	mockCosineSimilarity,
 } = vi.hoisted(() => ({
-	mockGetChunks: vi.fn(),
+	mockGetTopChunks: vi.fn(),
 	mockGenerateObject: vi.fn(),
 	mockGenerateText: vi.fn(),
 	mockEmbed: vi.fn(),
-	mockCosineSimilarity: vi.fn(),
 }));
 
 vi.mock('@/services/file', () => ({
-	getChunksByFileIds: mockGetChunks,
+	getTopChunksForFileIds: mockGetTopChunks,
 }));
 
 vi.mock('@ai-sdk/openai', () => ({
@@ -35,7 +29,6 @@ vi.mock('ai', () => ({
 	generateObject: mockGenerateObject,
 	generateText: mockGenerateText,
 	embed: mockEmbed,
-	cosineSimilarity: mockCosineSimilarity,
 }));
 
 type TextPart = {type: string; text: string};
@@ -87,37 +80,35 @@ describe('retrieveAndAugment', () => {
 		expect(mockGenerateText).not.toHaveBeenCalled();
 	});
 
-	it('performs RAG pipeline for questions and returns sources', async () => {
+	it('performs RAG pipeline for questions and returns sources from DB top-K', async () => {
 		const messages = [{role: 'user' as const, content: 'What is quantum computing?'}];
 
 		mockGenerateObject.mockResolvedValue({object: 'question'});
 		mockGenerateText.mockResolvedValue({text: 'Quantum computing uses qubits...'});
 		mockEmbed.mockResolvedValue({embedding: [0.1, 0.2, 0.3]});
-		mockGetChunks.mockResolvedValue([
+		mockGetTopChunks.mockResolvedValue([
 			{
-				id: '1/0', fileId: 1, content: 'Chunk A', embedding: [0.1, 0.2, 0.3],
+				id: '1/0', fileId: 1, content: 'Chunk A', similarity: 0.9,
 			},
 			{
-				id: '1/1', fileId: 1, content: 'Chunk B', embedding: [0.4, 0.5, 0.6],
+				id: '2/0', fileId: 2, content: 'Chunk C', similarity: 0.7,
 			},
 			{
-				id: '2/0', fileId: 2, content: 'Chunk C', embedding: [0.7, 0.8, 0.9],
+				id: '1/1', fileId: 1, content: 'Chunk B', similarity: 0.5,
 			},
 		]);
-
-		mockCosineSimilarity
-			.mockReturnValueOnce(0.9)
-			.mockReturnValueOnce(0.5)
-			.mockReturnValueOnce(0.7);
 
 		const result = await retrieveAndAugment({messages, fileIds: [1, 2]});
 
 		expect(mockGenerateObject).toHaveBeenCalledOnce();
 		expect(mockGenerateText).toHaveBeenCalledOnce();
 		expect(mockEmbed).toHaveBeenCalledOnce();
-		expect(mockGetChunks).toHaveBeenCalledWith({fileIds: [1, 2]});
+		expect(mockGetTopChunks).toHaveBeenCalledWith({
+			fileIds: [1, 2],
+			queryEmbedding: [0.1, 0.2, 0.3],
+			limit: 10,
+		});
 
-		// Check augmented messages
 		const lastMessage = result.messages.at(-1);
 		expect(lastMessage).toBeDefined();
 		expect(lastMessage?.role).toBe('user');
@@ -131,7 +122,7 @@ describe('retrieveAndAugment', () => {
 			expect(chunkTexts).toContain('Chunk B');
 			expect(chunkTexts).toContain('Chunk C');
 
-			// Check sorted by similarity: A(0.9) > C(0.7) > B(0.5)
+			// DB returns pre-sorted; verify order is preserved
 			const indexA = chunkTexts.indexOf('Chunk A');
 			const indexC = chunkTexts.indexOf('Chunk C');
 			const indexB = chunkTexts.indexOf('Chunk B');
@@ -139,7 +130,6 @@ describe('retrieveAndAugment', () => {
 			expect(indexC).toBeLessThan(indexB);
 		}
 
-		// Check sources returned
 		expect(result.sources).toHaveLength(3);
 		expect(result.sources[0]).toEqual({chunkId: '1/0', fileId: 1, similarity: 0.9});
 		expect(result.sources[1]).toEqual({chunkId: '2/0', fileId: 2, similarity: 0.7});
@@ -159,49 +149,17 @@ describe('retrieveAndAugment', () => {
 		mockGenerateObject.mockResolvedValue({object: 'question'});
 		mockGenerateText.mockResolvedValue({text: 'AI is...'});
 		mockEmbed.mockResolvedValue({embedding: [0.1]});
-		mockGetChunks.mockResolvedValue([
+		mockGetTopChunks.mockResolvedValue([
 			{
-				id: '1/0', fileId: 1, content: 'Chunk A', embedding: [0.1],
+				id: '1/0', fileId: 1, content: 'Chunk A', similarity: 0.9,
 			},
 		]);
-		mockCosineSimilarity.mockReturnValueOnce(0.9);
 
 		const result = await retrieveAndAugment({messages, fileIds: [1]});
 
-		// Classification prompt should join the two text parts
 		expect(mockGenerateObject).toHaveBeenCalledWith(expect.objectContaining({prompt: 'What is AI?\nExplain briefly.'}));
 
 		expect(result.sources).toHaveLength(1);
 		expect(result.sources[0].chunkId).toBe('1/0');
-	});
-
-	it('limits to top 10 chunks', async () => {
-		const messages = [{role: 'user' as const, content: 'What is AI?'}];
-
-		mockGenerateObject.mockResolvedValue({object: 'question'});
-		mockGenerateText.mockResolvedValue({text: 'AI is...'});
-		mockEmbed.mockResolvedValue({embedding: [0.1]});
-
-		const chunks = Array.from({length: 15}, (unused, index) => ({
-			id: `1/${index}`,
-			fileId: 1,
-			content: `Chunk ${index}`,
-			embedding: [index * 0.1],
-		}));
-		mockGetChunks.mockResolvedValue(chunks);
-
-		for (const index of chunks.keys()) {
-			mockCosineSimilarity.mockReturnValueOnce(1 - (index * 0.05));
-		}
-
-		const result = await retrieveAndAugment({messages, fileIds: [1]});
-
-		expect(result.sources).toHaveLength(10);
-
-		const lastMessage = result.messages.at(-1);
-		if (lastMessage && Array.isArray(lastMessage.content)) {
-			// 1 original text + 1 context header + 10 chunks = 12
-			expect(lastMessage.content).toHaveLength(12);
-		}
 	});
 });
