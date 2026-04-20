@@ -5,8 +5,13 @@ import {embedMany} from 'ai';
 import {z} from 'zod';
 import {getPdfContentFromUrl} from '@/utils/pdf';
 import {createFileWithChunks} from '@/services/file';
+import {getFileById, getChunksByFileIds} from '@/app/db';
 import {auth} from '@/app/(auth)/auth';
 import type {FileSourceType} from '@/schema';
+
+function normalizeForMatch(raw: string): string {
+	return raw.replaceAll(/\s+/gv, ' ').trim().toLowerCase();
+}
 
 function isFileSourceType(value: string): value is FileSourceType {
 	return value === 'upload' || value === 'generated' || value === 'manual';
@@ -48,15 +53,11 @@ export async function POST(request: Request) {
 
 	const session = await auth();
 
-	if (!session) {
-		return Response.redirect('/login');
+	if (!session?.user?.email) {
+		return new Response('Unauthorized', {status: 401});
 	}
 
-	const {user} = session;
-
-	if (!user?.email) {
-		return Response.redirect('/login');
-	}
+	const userEmail = session.user.email;
 
 	if (request.body === null) {
 		return new Response('Request body is empty', {status: 400});
@@ -65,10 +66,12 @@ export async function POST(request: Request) {
 	const contentType = request.headers.get('content-type') ?? '';
 	let content: string;
 	let sourceChunks: z.infer<typeof sourceChunkSchema> = [];
+	let parentFileId: number | undefined;
+	let quotedText: string | undefined;
 
 	if (contentType.includes('application/pdf')) {
 		const {downloadUrl, url} = await put(
-			`${user.email}/${filename}`,
+			`${userEmail}/${filename}`,
 			request.body,
 			{
 				access: 'public',
@@ -81,11 +84,50 @@ export async function POST(request: Request) {
 		const parsed = z.object({
 			content: z.string(),
 			sourceChunks: sourceChunkSchema.optional(),
+			parentFileId: z.number().int().positive().optional(),
+			quotedText: z.string().min(1).max(10_000).optional(),
 		}).parse(json);
 		content = parsed.content;
 		sourceChunks = parsed.sourceChunks ?? [];
+		parentFileId = parsed.parentFileId;
+		quotedText = parsed.quotedText;
 	} else {
 		content = await request.text();
+	}
+
+	if (parentFileId !== undefined) {
+		const parentFile = await getFileById({id: parentFileId});
+		if (!parentFile) {
+			return new Response('Parent file not found', {status: 404});
+		}
+
+		if (parentFile.userEmail !== userEmail) {
+			return new Response('Forbidden', {status: 403});
+		}
+
+		const parentChunks = await getChunksByFileIds({fileIds: [parentFileId]});
+		if (parentChunks.length === 0) {
+			return new Response('Parent file has no chunks', {status: 400});
+		}
+
+		const [firstChunk] = parentChunks;
+		let anchors = [firstChunk];
+
+		if (quotedText !== undefined) {
+			const needle = normalizeForMatch(quotedText).slice(0, 60);
+			if (needle.length > 0) {
+				const matches = parentChunks.filter(c => normalizeForMatch(c.content).includes(needle));
+				if (matches.length > 0) {
+					anchors = matches;
+				}
+			}
+		}
+
+		sourceChunks = anchors.map(c => ({
+			chunkId: c.id,
+			fileId: parentFileId!,
+			similarity: 1,
+		}));
 	}
 
 	const textSplitter = new RecursiveCharacterTextSplitter({
@@ -101,7 +143,7 @@ export async function POST(request: Request) {
 	const fileRecord = await createFileWithChunks({
 		pathname: filename,
 		title: titleParameter ?? null,
-		userEmail: user.email,
+		userEmail: userEmail,
 		sourceType,
 		chunks: chunkedContent.map((chunk, i) => ({
 			content: chunk.pageContent,

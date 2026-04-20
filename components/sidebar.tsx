@@ -9,6 +9,7 @@ import cx from 'classnames';
 import Fuse from 'fuse.js';
 import {useParams, usePathname} from 'next/navigation';
 import {useSidebar} from './sidebar-context';
+import {NoteComposer} from './note-composer';
 import {
 	CheckedSquare,
 	ChevronRightIcon,
@@ -326,6 +327,7 @@ export const Sidebar = () => {
 
 	const [activeTab, setActiveTab] = useState<'files' | 'history'>('files');
 	const [searchQuery, setSearchQuery] = useState('');
+	const [isNoteComposerOpen, setIsNoteComposerOpen] = useState(false);
 
 	const inputFileRef = useRef<HTMLInputElement>(null);
 	const [deleteQueue, setDeleteQueue] = useState<number[]>([]);
@@ -504,6 +506,16 @@ export const Sidebar = () => {
 						>
 							<UploadIcon size={14} />
 						</div>
+						<button
+							type='button'
+							onClick={() => {
+								setIsNoteComposerOpen(true);
+							}}
+							className='dark:text-zinc-400 dark:bg-zinc-700 hover:dark:bg-zinc-600 bg-zinc-100 hover:bg-zinc-200 px-2 py-1 rounded-md cursor-pointer text-xs font-semibold'
+							title='New note'
+						>
+							+ Note
+						</button>
 						<Link
 							href='/'
 							className='dark:text-zinc-400 dark:bg-zinc-700 hover:dark:bg-zinc-600 bg-zinc-100 hover:bg-zinc-200 p-1.5 rounded-md cursor-pointer'
@@ -569,6 +581,14 @@ export const Sidebar = () => {
 					</div>
 				</div>
 			</aside>
+
+			{isNoteComposerOpen && (
+				<NoteComposer
+					onClose={() => {
+						setIsNoteComposerOpen(false);
+					}}
+				/>
+			)}
 		</>
 	);
 };

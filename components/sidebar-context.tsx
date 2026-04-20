@@ -29,6 +29,8 @@ export type UploadOptions = {
 	title?: string;
 	sourceType?: 'upload' | 'generated' | 'manual';
 	sourceChunks?: SourceChunk[];
+	parentFileId?: number;
+	quotedText?: string;
 };
 
 type SidebarContextType = {
@@ -130,11 +132,25 @@ export function SidebarProvider({
 			let body: string | File | Blob;
 			let headers: Record<string, string> = {};
 
+			const hasSourceChunks = Boolean(options?.sourceChunks && options.sourceChunks.length > 0);
+			const hasParent = options?.parentFileId !== undefined;
+
 			if (content instanceof File) {
 				body = content;
-			} else if (options?.sourceChunks && options.sourceChunks.length > 0) {
-				// Send as JSON when we have source chunks to include
-				body = JSON.stringify({content, sourceChunks: options.sourceChunks});
+			} else if (hasSourceChunks || hasParent) {
+				const payload: Record<string, unknown> = {content};
+				if (hasSourceChunks) {
+					payload.sourceChunks = options!.sourceChunks;
+				}
+
+				if (hasParent) {
+					payload.parentFileId = options!.parentFileId;
+					if (options!.quotedText !== undefined) {
+						payload.quotedText = options!.quotedText;
+					}
+				}
+
+				body = JSON.stringify(payload);
 				headers = {'Content-Type': 'application/json'};
 			} else {
 				body = content;
