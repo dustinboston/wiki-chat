@@ -381,6 +381,11 @@ export const Sidebar = () => {
 		: history;
 
 	const handleDeleteFile = (fileId: number) => {
+		// eslint-disable-next-line no-alert
+		if (!globalThis.confirm('Delete this file? This action can be undone by an administrator.')) {
+			return;
+		}
+
 		void (async () => {
 			setDeleteQueue(queue => [...queue, fileId]);
 			await fetch(`/api/files/delete?id=${fileId}`, {method: 'DELETE'});
@@ -392,6 +397,11 @@ export const Sidebar = () => {
 	};
 
 	const handleDeleteChat = (id: string) => {
+		// eslint-disable-next-line no-alert
+		if (!globalThis.confirm('Delete this chat? This action can be undone by an administrator.')) {
+			return;
+		}
+
 		void (async () => {
 			setDeleteChatQueue(queue => [...queue, id]);
 			await fetch(`/api/history?id=${id}`, {method: 'DELETE'});

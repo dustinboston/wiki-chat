@@ -4,6 +4,7 @@ import {
 	getChatsByUser,
 	getChatById,
 	deleteChatById as dbDeleteChatById,
+	insertAuditLog,
 } from '@/app/db';
 
 export async function saveMessage({
@@ -33,5 +34,11 @@ export async function deleteChat({id, userEmail}: {id: string; userEmail: string
 	}
 
 	await dbDeleteChatById({id});
+	await insertAuditLog({
+		actor: userEmail,
+		action: 'delete_chat',
+		resourceType: 'Chat',
+		resourceId: id,
+	});
 	return chat;
 }

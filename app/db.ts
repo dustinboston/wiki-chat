@@ -1,12 +1,12 @@
 import {type Message} from 'ai';
 import {drizzle, type PostgresJsDatabase} from 'drizzle-orm/postgres-js';
 import {
-	desc, eq, inArray, type InferInsertModel,
+	and, desc, eq, inArray, isNull, type InferInsertModel,
 } from 'drizzle-orm';
 import postgres from 'postgres';
 import {
-	chat, chunk, file, fileSource, user,
-	type FileSourceType,
+	auditLog, chat, chunk, file, fileSource, user,
+	type AuditAction, type FileSourceType,
 } from '@/schema';
 import {env} from '@/app/env';
 
@@ -62,17 +62,23 @@ export async function getChatsByUser({email}: {email: string}) {
 	return getDb()
 		.select()
 		.from(chat)
-		.where(eq(chat.author, email))
+		.where(and(eq(chat.author, email), isNull(chat.deletedAt)))
 		.orderBy(desc(chat.createdAt));
 }
 
 export async function getChatById({id}: {id: string}) {
-	const [selectedChat] = await getDb().select().from(chat).where(eq(chat.id, id));
+	const [selectedChat] = await getDb()
+		.select()
+		.from(chat)
+		.where(and(eq(chat.id, id), isNull(chat.deletedAt)));
 	return selectedChat;
 }
 
 export async function deleteChatById({id}: {id: string}) {
-	return getDb().delete(chat).where(eq(chat.id, id));
+	return getDb()
+		.update(chat)
+		.set({deletedAt: new Date()})
+		.where(eq(chat.id, id));
 }
 
 export async function createFile({
@@ -118,19 +124,23 @@ export async function getFilesByUser({email}: {email: string}) {
 	return getDb()
 		.select()
 		.from(file)
-		.where(eq(file.userEmail, email))
+		.where(and(eq(file.userEmail, email), isNull(file.deletedAt)))
 		.orderBy(desc(file.createdAt));
 }
 
 export async function getFileById({id}: {id: number}) {
-	const [result] = await getDb().select().from(file).where(eq(file.id, id));
+	const [result] = await getDb()
+		.select()
+		.from(file)
+		.where(and(eq(file.id, id), isNull(file.deletedAt)));
 	return result;
 }
 
 export async function deleteFileById({id}: {id: number}) {
-	await getDb().delete(fileSource).where(eq(fileSource.fileId, id));
-	await getDb().delete(chunk).where(eq(chunk.fileId, id));
-	await getDb().delete(file).where(eq(file.id, id));
+	return getDb()
+		.update(file)
+		.set({deletedAt: new Date()})
+		.where(eq(file.id, id));
 }
 
 export async function insertFileSources({
@@ -143,6 +153,25 @@ export async function insertFileSources({
 	}
 
 	return getDb().insert(fileSource).values(sources);
+}
+
+export async function insertAuditLog({
+	actor,
+	action,
+	resourceType,
+	resourceId,
+}: {
+	actor: string;
+	action: AuditAction;
+	resourceType: string;
+	resourceId: string;
+}) {
+	return getDb().insert(auditLog).values({
+		actor,
+		action,
+		resourceType,
+		resourceId,
+	});
 }
 
 export async function getSourcesByFileId({fileId}: {fileId: number}) {

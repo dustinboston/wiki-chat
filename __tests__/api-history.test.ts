@@ -46,7 +46,7 @@ describe('GET /api/history', () => {
 	it('returns chats for authenticated user', async () => {
 		const now = new Date();
 		const chats: Chat[] = [{
-			id: '1', author: 'a@b.com', messages: [], createdAt: now,
+			id: '1', author: 'a@b.com', messages: [], createdAt: now, deletedAt: null,
 		}];
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
 		mockListChats.mockResolvedValue(chats);
@@ -56,7 +56,7 @@ describe('GET /api/history', () => {
 
 		expect(mockListChats).toHaveBeenCalledWith({email: 'a@b.com'});
 		expect(body).toEqual([{
-			id: '1', author: 'a@b.com', messages: [], createdAt: now.toISOString(),
+			id: '1', author: 'a@b.com', messages: [], createdAt: now.toISOString(), deletedAt: null,
 		}]);
 	});
 });

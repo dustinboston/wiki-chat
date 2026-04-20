@@ -18,16 +18,33 @@ const sourceChunkSchema = z.array(z.object({
 	similarity: z.number(),
 }));
 
+function sanitizeFilename(raw: string): string {
+	return raw
+		.replaceAll(/[\/\\:*?"<>\|]/gv, '_')
+		.replaceAll(/\.{2,}/gv, '.')
+		.trim()
+		.slice(0, 255);
+}
+
+const uploadParametersSchema = z.object({
+	filename: z.string().min(1, 'Missing filename parameter').transform(sanitizeFilename),
+	title: z.string().nullable(),
+	sourceType: z.string().refine(isFileSourceType).default('upload'),
+});
+
 export async function POST(request: Request) {
 	const {searchParams} = new URL(request.url);
-	const filename = searchParams.get('filename');
-	const titleParameter = searchParams.get('title');
-	const sourceTypeParameter = searchParams.get('sourceType') ?? 'upload';
-	const sourceType: FileSourceType = isFileSourceType(sourceTypeParameter) ? sourceTypeParameter : 'upload';
+	const parameterResult = uploadParametersSchema.safeParse({
+		filename: searchParams.get('filename'),
+		title: searchParams.get('title'),
+		sourceType: searchParams.get('sourceType') ?? 'upload',
+	});
 
-	if (!filename) {
-		return new Response('Missing filename parameter', {status: 400});
+	if (!parameterResult.success) {
+		return new Response(parameterResult.error.issues[0].message, {status: 400});
 	}
+
+	const {filename, title: titleParameter, sourceType} = parameterResult.data;
 
 	const session = await auth();
 

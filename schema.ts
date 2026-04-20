@@ -11,6 +11,8 @@ import {
 	integer,
 } from 'drizzle-orm/pg-core';
 
+export type AuditAction = 'delete_chat' | 'delete_file';
+
 export type FileSourceType = 'upload' | 'generated' | 'manual';
 
 export const user = pgTable('User', {
@@ -25,6 +27,7 @@ export const chat = pgTable('Chat', {
 	author: varchar('author', {length: 64})
 		.notNull()
 		.references(() => user.email),
+	deletedAt: timestamp('deletedAt'),
 });
 
 export const file = pgTable('File', {
@@ -36,6 +39,7 @@ export const file = pgTable('File', {
 		.notNull()
 		.references(() => user.email),
 	createdAt: timestamp('createdAt').notNull().defaultNow(),
+	deletedAt: timestamp('deletedAt'),
 });
 
 export const chunk = pgTable('Chunk', {
@@ -58,8 +62,18 @@ export const fileSource = pgTable('FileSource', {
 	similarity: real('similarity').notNull(),
 });
 
+export const auditLog = pgTable('AuditLog', {
+	id: serial('id').primaryKey(),
+	actor: varchar('actor', {length: 64}).notNull(),
+	timestamp: timestamp('timestamp').notNull().defaultNow(),
+	action: varchar('action', {length: 32}).notNull().$type<AuditAction>(),
+	resourceType: varchar('resourceType', {length: 32}).notNull(),
+	resourceId: text('resourceId').notNull(),
+});
+
 export type Chat = InferSelectModel<typeof chat>;
 
 export type File = InferSelectModel<typeof file>;
 export type Chunk = InferSelectModel<typeof chunk>;
 export type FileSource = InferSelectModel<typeof fileSource>;
+export type AuditLog = InferSelectModel<typeof auditLog>;

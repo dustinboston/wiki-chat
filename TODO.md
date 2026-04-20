@@ -81,21 +81,21 @@
 - **Execution Independence:** Can review PRs for security anti-patterns in parallel with testing.
 
 - **Secrets Management:** All cryptographic keys, API tokens, and database credentials must be encrypted at rest and injected via secure managers (e.g., AWS Secrets Manager, HashiCorp Vault). Require key rotation mechanisms.
-  - [ ] All secrets are plain-text in `.env.local`. No secrets manager integration.
-  - [ ] No key rotation mechanism for `AUTH_SECRET` or `OPENAI_API_KEY`.
-  - [ ] Document the secrets management strategy (Vercel environment variables for prod, `.env.local` for dev).
+  - [x] All secrets are plain-text in `.env.local`. No secrets manager integration.
+  - [x] No key rotation mechanism for `AUTH_SECRET` or `OPENAI_API_KEY`.
+  - [x] Document the secrets management strategy (Vercel environment variables for prod, `.env.local` for dev).
 - **Destructive Operations:** Any `DELETE` or `DROP` operations must implement soft-delete (boolean flags) or robust undo mechanisms. All destructive actions require an immutable audit log entry (actor, timestamp, action, resource).
-  - [ ] `deleteChatById` (`app/db.ts:77`) performs a hard DELETE with no audit trail.
-  - [ ] `deleteFileById` (`app/db.ts:125-128`) hard-deletes both chunks and file records — no soft-delete, no audit log.
-  - [ ] Add `deletedAt` timestamp columns to `Chat` and `File` tables for soft-delete.
-  - [ ] Create an audit log table (actor, timestamp, action, resourceType, resourceId).
-  - [ ] No confirmation prompt on the client — sidebar delete buttons fire immediately.
+  - [x] `deleteChatById` (`app/db.ts:77`) performs a hard DELETE with no audit trail.
+  - [x] `deleteFileById` (`app/db.ts:125-128`) hard-deletes both chunks and file records — no soft-delete, no audit log.
+  - [x] Add `deletedAt` timestamp columns to `Chat` and `File` tables for soft-delete.
+  - [x] Create an audit log table (actor, timestamp, action, resourceType, resourceId).
+  - [x] No confirmation prompt on the client — sidebar delete buttons fire immediately.
 - **API Contracts:** Endpoints must have defined input/output schemas (e.g., OpenAPI/Swagger) to prevent injection and enforce strict payload boundaries.
   - [ ] No OpenAPI/Swagger definitions.
-  - [ ] `POST /api/chat` — `request.json()` is not validated. `id`, `messages`, `selectedFileIds` are destructured with no schema.
-  - [ ] `POST /api/files/upload` — `filename` from query params is used unsanitized at `line 58`.
-  - [ ] No Zod request-body validation on any API route (Zod is already a dependency).
-  - [ ] Add Zod schemas for all API request/response shapes.
+  - [x] `POST /api/chat` — `request.json()` is not validated. `id`, `messages`, `selectedFileIds` are destructured with no schema.
+  - [x] `POST /api/files/upload` — `filename` from query params is used unsanitized at `line 58`.
+  - [x] No Zod request-body validation on any API route (Zod is already a dependency).
+  - [x] Add Zod schemas for all API request/response shapes.
 
 ### Module 5: Resilience & Traffic Management
 
@@ -172,5 +172,5 @@
 
 - [x] **Dead code:** `components/data.ts` exports `ORDERS`, `TRACKING_INFORMATION`, `getOrders`, `getTrackingInformation` — demo data from the original template, unused by the app. Remove it.
 - [ ] **Dead code:** `proxy.ts` — intended as Next.js middleware but named wrong. Rename to `middleware.ts` or delete if not needed.
-- [ ] **Package name:** `package.json` name is `"ai-sdk-preview-internal-knowledge-base"` — leftover from the template. Rename to `"wiki-chat"`.
+- [x] **Package name:** `package.json` name is `"ai-sdk-preview-internal-knowledge-base"` — leftover from the template. Rename to `"wiki-chat"`.
 - [ ] **Metadata:** `layout.tsx` `metadataBase` points to `ai-sdk-preview-internal-knowledge-base.vercel.app` — update to the actual deployment URL.

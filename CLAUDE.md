@@ -63,6 +63,8 @@ Create `.env.local` with these values for local development.
 - **RAG pipeline** is in `ai/rag.ts` — classifies messages, generates hypothetical answers (HyDE), retrieves chunks by cosine similarity, then augments the prompt. Returns source chunk metadata for provenance tracking.
 - **Service layer** in `services/` — business logic (auth, chat, file). Route handlers and pages call services; services call `app/db.ts`.
 - **Database repository** is `app/db.ts` — pure data access, no business logic.
-- **Schema** is in `schema.ts` — tables: User, Chat, File, Chunk, FileSource.
+- **Schema** is in `schema.ts` — tables: User, Chat, File, Chunk, FileSource, AuditLog.
+- **Soft-delete** — Chat and File tables have a `deletedAt` column. Deletes set this timestamp instead of removing rows. All queries filter out soft-deleted records.
+- **Audit logging** — destructive operations write to the AuditLog table (actor, action, resourceType, resourceId). See `SECURITY.md` for details.
 - **Migrations** live in `drizzle/` and are generated via `pnpm db:generate`.
 - The `@/*` path alias maps to the project root.

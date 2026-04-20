@@ -4,11 +4,11 @@ import {listChats, deleteChat} from '@/services/chat';
 export async function GET() {
 	const session = await auth();
 
-	if (!session?.user) {
+	if (!session?.user?.email) {
 		return Response.json('Unauthorized!', {status: 401});
 	}
 
-	const chats = await listChats({email: session.user.email!});
+	const chats = await listChats({email: session.user.email});
 	return Response.json(chats);
 }
 
@@ -17,7 +17,7 @@ export async function DELETE(request: Request) {
 
 	const session = await auth();
 
-	if (!session?.user) {
+	if (!session?.user?.email) {
 		return Response.json('Unauthorized!', {status: 401});
 	}
 
@@ -27,7 +27,7 @@ export async function DELETE(request: Request) {
 		return new Response('Chat ID not provided', {status: 400});
 	}
 
-	const deleted = await deleteChat({id, userEmail: session.user.email!});
+	const deleted = await deleteChat({id, userEmail: session.user.email});
 	if (!deleted) {
 		return new Response('Chat not found', {status: 404});
 	}

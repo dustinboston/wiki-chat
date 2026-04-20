@@ -6,6 +6,7 @@ import {
 	getFilesByUser,
 	getFileById,
 	deleteFileById as dbDeleteFileById,
+	insertAuditLog,
 	getSourcesByFileId,
 	getDerivedFilesByFileId,
 } from '@/app/db';
@@ -77,6 +78,12 @@ export async function deleteFile({id, userEmail}: {id: number; userEmail: string
 	}
 
 	await dbDeleteFileById({id});
+	await insertAuditLog({
+		actor: userEmail,
+		action: 'delete_file',
+		resourceType: 'File',
+		resourceId: String(id),
+	});
 	return file;
 }
 
