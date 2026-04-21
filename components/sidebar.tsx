@@ -7,7 +7,7 @@ import useSWR from 'swr';
 import Link from 'next/link';
 import cx from 'classnames';
 import Fuse from 'fuse.js';
-import {useParams, usePathname, useRouter} from 'next/navigation';
+import {useParams, usePathname} from 'next/navigation';
 import {useSidebar} from './sidebar-context';
 import {NoteComposer} from './note-composer';
 import {
@@ -33,17 +33,11 @@ type FileEntry = {
 function FileListItem({
 	file,
 	isSelected,
-	isDeleting,
 	onToggleSelect,
-	onDelete,
-	onView,
 }: {
 	file: FileEntry;
 	isSelected: boolean;
-	isDeleting: boolean;
 	onToggleSelect: () => void;
-	onDelete: () => void;
-	onView: () => void;
 }) {
 	const displayName = file.title ?? file.pathname;
 	const sourceLabel = file.sourceType === 'generated' ? 'GEN' : (file.sourceType === 'manual' ? 'NOTE' : undefined);
@@ -51,59 +45,34 @@ function FileListItem({
 	return (
 		<div
 			className={cx(
-				'flex flex-row p-2 border-b dark:border-zinc-700',
+				'flex flex-row items-center gap-3 p-2 border-b dark:border-zinc-700',
 				isSelected && 'bg-zinc-100 dark:bg-zinc-700 dark:border-zinc-600',
 			)}
 		>
-			<div
-				className='flex flex-row items-center flex-1 min-w-0 gap-4 cursor-pointer'
+			<button
+				type='button'
 				onClick={onToggleSelect}
-			>
-				<div
-					className={cx(
-						'cursor-pointer',
-						isSelected && !isDeleting
-							? 'text-blue-600 dark:text-zinc-50'
-							: 'text-zinc-500',
-					)}
-				>
-					{isDeleting
-						? (
-							<div className='animate-spin'>
-								<LoaderIcon />
-							</div>
-						)
-						: (isSelected
-							? (
-								<CheckedSquare />
-							)
-							: (
-								<UncheckedSquare />
-							))}
-				</div>
-				<div className='flex-1 text-sm text-zinc-500 dark:text-zinc-400 truncate'>
-					{displayName}
-				</div>
-				{sourceLabel && (
-					<span className='flex-shrink-0 text-[10px] px-1 py-0.5 rounded bg-zinc-200 dark:bg-zinc-600 text-zinc-500 dark:text-zinc-400'>
-						{sourceLabel}
-					</span>
+				aria-label={isSelected ? 'Deselect file' : 'Select file'}
+				className={cx(
+					'cursor-pointer flex-shrink-0',
+					isSelected
+						? 'text-blue-600 dark:text-zinc-50'
+						: 'text-zinc-500',
 				)}
-			</div>
-
-			<div
-				className='text-zinc-500 hover:bg-red-100 dark:text-zinc-500 hover:dark:bg-zinc-600 hover:text-red-500 p-1 px-2 cursor-pointer rounded-md'
-				onClick={onDelete}
 			>
-				<TrashIcon />
-			</div>
-			<div
-				className='text-zinc-500 hover:bg-zinc-200 dark:text-zinc-500 hover:dark:bg-zinc-600 p-1 px-1 cursor-pointer rounded-md'
-				onClick={onView}
-				title='View file contents'
+				{isSelected ? <CheckedSquare /> : <UncheckedSquare />}
+			</button>
+			<Link
+				href={`/notes/${file.id}`}
+				className='flex-1 min-w-0 text-sm text-zinc-500 dark:text-zinc-400 truncate hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors'
 			>
-				<ChevronRightIcon />
-			</div>
+				{displayName}
+			</Link>
+			{sourceLabel && (
+				<span className='flex-shrink-0 text-[10px] px-1 py-0.5 rounded bg-zinc-200 dark:bg-zinc-600 text-zinc-500 dark:text-zinc-400'>
+					{sourceLabel}
+				</span>
+			)}
 		</div>
 	);
 }
@@ -113,21 +82,15 @@ function FilesTabContent({
 	files,
 	searchQuery,
 	selectedFileIds,
-	deleteQueue,
 	uploadQueue,
 	onToggleSelect,
-	onDelete,
-	onView,
 }: {
 	isLoading: boolean;
 	files: FileEntry[] | undefined;
 	searchQuery: string;
 	selectedFileIds: number[];
-	deleteQueue: number[];
 	uploadQueue: string[];
 	onToggleSelect: (id: number) => void;
-	onDelete: (id: number) => void;
-	onView: (id: number, name: string) => void;
 }) {
 	if (isLoading) {
 		return (
@@ -163,15 +126,8 @@ function FilesTabContent({
 					key={file.id}
 					file={file}
 					isSelected={selectedFileIds.includes(file.id)}
-					isDeleting={deleteQueue.includes(file.id)}
 					onToggleSelect={() => {
 						onToggleSelect(file.id);
-					}}
-					onDelete={() => {
-						onDelete(file.id);
-					}}
-					onView={() => {
-						onView(file.id, file.title ?? file.pathname);
 					}}
 				/>
 			))}
@@ -323,14 +279,12 @@ export const Sidebar = () => {
 		uploadQueue,
 		uploadFile,
 	} = useSidebar();
-	const router = useRouter();
 
 	const [activeTab, setActiveTab] = useState<'files' | 'history'>('files');
 	const [searchQuery, setSearchQuery] = useState('');
 	const [isNoteComposerOpen, setIsNoteComposerOpen] = useState(false);
 
 	const inputFileRef = useRef<HTMLInputElement>(null);
-	const [deleteQueue, setDeleteQueue] = useState<number[]>([]);
 	const [deleteChatQueue, setDeleteChatQueue] = useState<string[]>([]);
 
 	const {
@@ -381,22 +335,6 @@ export const Sidebar = () => {
 	const filteredHistory = searchQuery
 		? historyFuse.search(searchQuery).map(result => result.item)
 		: history;
-
-	const handleDeleteFile = (fileId: number) => {
-		// eslint-disable-next-line no-alert
-		if (!globalThis.confirm('Delete this file? This action can be undone by an administrator.')) {
-			return;
-		}
-
-		void (async () => {
-			setDeleteQueue(queue => [...queue, fileId]);
-			await fetch(`/api/files/delete?id=${fileId}`, {method: 'DELETE'});
-			setDeleteQueue(queue => queue.filter(id => id !== fileId));
-			setSelectedFileIds(selected =>
-				selected.filter(id => id !== fileId));
-			void mutateFiles(files?.filter(entry => entry.id !== fileId));
-		})();
-	};
 
 	const handleDeleteChat = (id: string) => {
 		// eslint-disable-next-line no-alert
@@ -551,13 +489,8 @@ export const Sidebar = () => {
 								files={filteredFiles}
 								searchQuery={searchQuery}
 								selectedFileIds={selectedFileIds}
-								deleteQueue={deleteQueue}
 								uploadQueue={uploadQueue}
 								onToggleSelect={handleToggleFileSelect}
-								onDelete={handleDeleteFile}
-								onView={id => {
-									router.push(`/notes/${id}`);
-								}}
 							/>
 						)
 						: (

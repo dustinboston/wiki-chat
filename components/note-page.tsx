@@ -4,9 +4,9 @@ import {
 	Fragment, useEffect, useRef, useState,
 } from 'react';
 import {useRouter} from 'next/navigation';
-import useSWR from 'swr';
+import useSWR, {mutate} from 'swr';
 import {fileContentSchema} from './sidebar-context';
-import {LoaderIcon} from './icons';
+import {LoaderIcon, TrashIcon} from './icons';
 import {NoteComposer} from './note-composer';
 import {NotePopover} from './note-popover';
 import {NoteExpander} from './note-expander';
@@ -227,11 +227,30 @@ type Selection = {
 };
 
 export function NotePage({fileId}: {fileId: number}) {
+	const router = useRouter();
 	const bodyRef = useRef<HTMLDivElement>(null);
 	const [composerState, setComposerState] = useState<{quotedText?: string} | null>(null);
 	const [selection, setSelection] = useState<Selection | null>(null);
 	const [popoverNoteId, setPopoverNoteId] = useState<number | null>(null);
 	const [isExpanderOpen, setIsExpanderOpen] = useState(false);
+	const [isDeleting, setIsDeleting] = useState(false);
+
+	const handleDelete = async () => {
+		// eslint-disable-next-line no-alert
+		if (!globalThis.confirm('Delete this file? This action can be undone by an administrator.')) {
+			return;
+		}
+
+		setIsDeleting(true);
+		const response = await fetch(`/api/files/delete?id=${fileId}`, {method: 'DELETE'});
+		if (response.ok) {
+			await mutate('/api/files/list');
+			router.push('/');
+			return;
+		}
+
+		setIsDeleting(false);
+	};
 
 	const {data: noteData, isLoading: isLoadingContent} = useSWR(
 		`/api/files/content?id=${fileId}`,
@@ -318,17 +337,19 @@ export function NotePage({fileId}: {fileId: number}) {
 					<h2 className='text-lg font-semibold text-zinc-800 dark:text-zinc-200 truncate'>
 						{label ?? 'Loading...'}
 					</h2>
-					<div className='flex flex-row gap-2 flex-shrink-0 ml-4'>
+					<div className='flex flex-row gap-2 flex-shrink-0 ml-4 items-center'>
 						<button
+							type='button'
 							onClick={() => {
 								setComposerState({});
 							}}
-							className='text-sm px-3 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-zinc-600 dark:text-zinc-300 transition-colors'
+							className='text-sm px-3 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-50 transition-colors'
 						>
 							Note
 						</button>
 						{canExpand && (
 							<button
+								type='button'
 								onClick={() => {
 									setIsExpanderOpen(true);
 								}}
@@ -337,6 +358,28 @@ export function NotePage({fileId}: {fileId: number}) {
 								Expand
 							</button>
 						)}
+						<button
+							type='button'
+							onClick={() => {
+								void handleDelete();
+							}}
+							disabled={isDeleting}
+							title='Delete this file'
+							aria-label='Delete this file'
+							className={
+								'p-1.5 rounded-md cursor-pointer transition-colors '
+								+ 'text-zinc-500 hover:text-red-500 hover:bg-red-100 dark:hover:bg-zinc-700 '
+								+ 'disabled:opacity-60 disabled:cursor-not-allowed'
+							}
+						>
+							{isDeleting
+								? (
+									<div className='animate-spin'>
+										<LoaderIcon />
+									</div>
+								)
+								: <TrashIcon />}
+						</button>
 					</div>
 				</div>
 
