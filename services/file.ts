@@ -26,7 +26,7 @@ export async function createFileWithChunks({
 	userEmail: string;
 	sourceType: FileSourceType;
 	chunks: Array<{content: string; embedding: number[]}>;
-	sourceChunks: Array<{chunkId: string; fileId: number; similarity: number}>;
+	sourceChunks: Array<{chunkId: string; fileId: number; similarity: number; quotedText?: string | null}>;
 }) {
 	const fileRecord = await dbCreateFile({
 		pathname, title, userEmail, sourceType,
@@ -47,6 +47,7 @@ export async function createFileWithChunks({
 				fileId: fileRecord.id,
 				sourceChunkId: sc.chunkId,
 				similarity: sc.similarity,
+				quotedText: sc.quotedText ?? null,
 			})),
 		});
 	}
@@ -117,16 +118,38 @@ export async function getFileSources({id, userEmail}: {id: number; userEmail: st
 	const sources = [...sourceMap.values()]
 		.toSorted((a, b) => b.similarity - a.similarity);
 
-	const derived = await getDerivedFilesByFileId({fileId: id});
+	const derivedRows = await getDerivedFilesByFileId({fileId: id});
+	const derivedMap = new Map<number, {
+		fileId: number;
+		title: string | null;
+		pathname: string;
+		sourceType: FileSourceType;
+		highlights: Array<{quotedText: string | null; sourceChunkId: string}>;
+	}>();
+
+	for (const row of derivedRows) {
+		let entry = derivedMap.get(row.derivedFileId);
+		if (!entry) {
+			entry = {
+				fileId: row.derivedFileId,
+				title: row.derivedFileTitle,
+				pathname: row.derivedFilePathname,
+				sourceType: row.derivedFileSourceType,
+				highlights: [],
+			};
+			derivedMap.set(row.derivedFileId, entry);
+		}
+
+		entry.highlights.push({
+			quotedText: row.quotedText,
+			sourceChunkId: row.sourceChunkId,
+		});
+	}
 
 	return {
 		sourceType: file.sourceType,
 		sources,
-		derived: derived.map(d => ({
-			fileId: d.derivedFileId,
-			title: d.derivedFileTitle,
-			pathname: d.derivedFilePathname,
-		})),
+		derived: [...derivedMap.values()],
 	};
 }
 

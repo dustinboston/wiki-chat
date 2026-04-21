@@ -6,15 +6,11 @@ export async function GET(request: Request) {
 
 	const session = await auth();
 
-	if (!session) {
-		return Response.redirect('/login');
+	if (!session?.user?.email) {
+		return new Response('Unauthorized', {status: 401});
 	}
 
-	const {user} = session;
-
-	if (!user?.email) {
-		return Response.redirect('/login');
-	}
+	const userEmail = session.user.email;
 
 	const idParameter = searchParams.get('id');
 
@@ -27,7 +23,7 @@ export async function GET(request: Request) {
 		return new Response('Invalid file ID', {status: 400});
 	}
 
-	const result = await getFileSources({id, userEmail: user.email});
+	const result = await getFileSources({id, userEmail});
 	if (!result) {
 		return new Response('File not found', {status: 404});
 	}

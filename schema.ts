@@ -10,6 +10,7 @@ import {
 	serial,
 	integer,
 	vector,
+	index,
 } from 'drizzle-orm/pg-core';
 
 export type AuditAction = 'delete_chat' | 'delete_file';
@@ -50,7 +51,10 @@ export const chunk = pgTable('Chunk', {
 		.references(() => file.id),
 	content: text('content').notNull(),
 	embedding: vector('embedding', {dimensions: 1536}).notNull(),
-});
+}, table => ({
+	embeddingIdx: index('Chunk_embedding_idx')
+		.using('hnsw', table.embedding.op('vector_cosine_ops')),
+}));
 
 export const fileSource = pgTable('FileSource', {
 	id: serial('id').primaryKey(),
@@ -61,6 +65,7 @@ export const fileSource = pgTable('FileSource', {
 		.notNull()
 		.references(() => chunk.id),
 	similarity: real('similarity').notNull(),
+	quotedText: text('quotedText'),
 });
 
 export const auditLog = pgTable('AuditLog', {

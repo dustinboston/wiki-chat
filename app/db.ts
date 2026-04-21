@@ -169,7 +169,12 @@ export async function deleteFileById({id}: {id: number}) {
 export async function insertFileSources({
 	sources,
 }: {
-	sources: Array<{fileId: number; sourceChunkId: string; similarity: number}>;
+	sources: Array<{
+		fileId: number;
+		sourceChunkId: string;
+		similarity: number;
+		quotedText?: string | null;
+	}>;
 }) {
 	if (sources.length === 0) {
 		return;
@@ -215,13 +220,17 @@ export async function getSourcesByFileId({fileId}: {fileId: number}) {
 
 export async function getDerivedFilesByFileId({fileId}: {fileId: number}) {
 	return getDb()
-		.selectDistinct({
+		.select({
 			derivedFileId: fileSource.fileId,
 			derivedFileTitle: file.title,
 			derivedFilePathname: file.pathname,
+			derivedFileSourceType: file.sourceType,
+			sourceChunkId: fileSource.sourceChunkId,
+			quotedText: fileSource.quotedText,
 		})
 		.from(fileSource)
 		.innerJoin(chunk, eq(fileSource.sourceChunkId, chunk.id))
 		.innerJoin(file, eq(fileSource.fileId, file.id))
-		.where(eq(chunk.fileId, fileId));
+		.where(eq(chunk.fileId, fileId))
+		.orderBy(fileSource.id);
 }

@@ -65,7 +65,7 @@ export async function POST(request: Request) {
 
 	const contentType = request.headers.get('content-type') ?? '';
 	let content: string;
-	let sourceChunks: z.infer<typeof sourceChunkSchema> = [];
+	let sourceChunks: Array<{chunkId: string; fileId: number; similarity: number; quotedText?: string | null}> = [];
 	let parentFileId: number | undefined;
 	let quotedText: string | undefined;
 
@@ -125,8 +125,9 @@ export async function POST(request: Request) {
 
 		sourceChunks = anchors.map(c => ({
 			chunkId: c.id,
-			fileId: parentFileId!,
+			fileId: parentFileId,
 			similarity: 1,
+			quotedText: quotedText ?? null,
 		}));
 	}
 
@@ -143,7 +144,7 @@ export async function POST(request: Request) {
 	const fileRecord = await createFileWithChunks({
 		pathname: filename,
 		title: titleParameter ?? null,
-		userEmail: userEmail,
+		userEmail,
 		sourceType,
 		chunks: chunkedContent.map((chunk, i) => ({
 			content: chunk.pageContent,

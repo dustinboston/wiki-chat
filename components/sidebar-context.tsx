@@ -16,9 +16,11 @@ import {type Session} from 'next-auth';
 import {z} from 'zod';
 import type {SourceChunk} from '@/ai/rag';
 
-const fileContentSchema = z.object({
+export const fileContentSchema = z.object({
 	content: z.string(),
 	truncated: z.boolean(),
+	title: z.string().nullable().optional(),
+	pathname: z.string().optional(),
 });
 
 const uploadResponseSchema = z.object({
@@ -144,9 +146,9 @@ export function SidebarProvider({
 				}
 
 				if (hasParent) {
-					payload.parentFileId = options!.parentFileId;
-					if (options!.quotedText !== undefined) {
-						payload.quotedText = options!.quotedText;
+					payload.parentFileId = options.parentFileId;
+					if (options.quotedText !== undefined) {
+						payload.quotedText = options.quotedText;
 					}
 				}
 
@@ -169,6 +171,10 @@ export function SidebarProvider({
 				const json: unknown = await response.json();
 				const data = uploadResponseSchema.parse(json);
 				void mutate('/api/files/list');
+				if (options?.parentFileId !== undefined) {
+					void mutate(`/api/files/sources?id=${options.parentFileId}`);
+				}
+
 				return data.id;
 			}
 

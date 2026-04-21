@@ -5,7 +5,7 @@ import {type Session} from 'next-auth';
 import {POST as upload} from '@/app/(chat)/api/files/upload/route';
 
 type CreateFileArgs = {
-	sourceChunks: Array<{chunkId: string; fileId: number; similarity: number}>;
+	sourceChunks: Array<{chunkId: string; fileId: number; similarity: number; quotedText?: string | null}>;
 	sourceType: string;
 };
 
@@ -141,7 +141,9 @@ describe('POST /api/files/upload parentFileId', () => {
 		expect(response.status).toBe(200);
 		const call = getLastCreateFileCall();
 		expect(call.sourceChunks).toEqual([
-			{chunkId: '7/0', fileId: 7, similarity: 1},
+			{
+				chunkId: '7/0', fileId: 7, similarity: 1, quotedText: null,
+			},
 		]);
 	});
 
@@ -169,6 +171,7 @@ describe('POST /api/files/upload parentFileId', () => {
 		const call = getLastCreateFileCall();
 		expect(call.sourceChunks).toHaveLength(1);
 		expect(call.sourceChunks[0].chunkId).toBe('7/1');
+		expect(call.sourceChunks[0].quotedText).toBe('The quick brown fox');
 	});
 
 	it('falls back to first chunk when quotedText has no match', async () => {
@@ -191,7 +194,9 @@ describe('POST /api/files/upload parentFileId', () => {
 		expect(response.status).toBe(200);
 		const call = getLastCreateFileCall();
 		expect(call.sourceChunks).toEqual([
-			{chunkId: '7/0', fileId: 7, similarity: 1},
+			{
+				chunkId: '7/0', fileId: 7, similarity: 1, quotedText: 'something entirely unfindable',
+			},
 		]);
 	});
 
@@ -216,7 +221,9 @@ describe('POST /api/files/upload parentFileId', () => {
 		expect(response.status).toBe(200);
 		const call = getLastCreateFileCall();
 		expect(call.sourceChunks).toEqual([
-			{chunkId: '7/0', fileId: 7, similarity: 1},
+			{
+				chunkId: '7/0', fileId: 7, similarity: 1, quotedText: null,
+			},
 		]);
 	});
 

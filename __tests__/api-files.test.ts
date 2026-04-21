@@ -74,16 +74,18 @@ describe('GET /api/files/list', () => {
 describe('GET /api/files/content', () => {
 	beforeEach(() => vi.clearAllMocks());
 
-	it('redirects when not authenticated', async () => {
+	it('returns 401 when not authenticated', async () => {
 		mockAuth.mockResolvedValue(null);
 		const request = new Request('http://localhost/api/files/content?id=1');
-		await expect(getContent(request)).rejects.toThrow();
+		const response = await getContent(request);
+		expect(response.status).toBe(401);
 	});
 
-	it('redirects when user has no email', async () => {
+	it('returns 401 when user has no email', async () => {
 		mockAuth.mockResolvedValue({expires: ''});
 		const request = new Request('http://localhost/api/files/content?id=1');
-		await expect(getContent(request)).rejects.toThrow();
+		const response = await getContent(request);
+		expect(response.status).toBe(401);
 	});
 
 	it('returns 400 when no id provided', async () => {

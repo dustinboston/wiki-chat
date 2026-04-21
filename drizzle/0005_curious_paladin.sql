@@ -1,0 +1,1 @@
+ALTER TABLE "FileSource" ADD COLUMN IF NOT EXISTS "quotedText" text;
