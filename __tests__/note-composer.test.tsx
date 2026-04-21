@@ -36,13 +36,13 @@ describe('NoteComposer', () => {
 	it('disables Save when body is empty', () => {
 		render(<NoteComposer onClose={noop} />);
 		const save = screen.getByRole('button', {name: /save/iv});
-		expect(save.disabled).toBe(true);
+		expect(save).toBeDisabled();
 	});
 
 	it('prefills body with blockquote when quotedText is provided', () => {
 		render(<NoteComposer onClose={noop} quotedText='hello world' />);
 		const textarea = screen.getByPlaceholderText(/write your note/iv);
-		expect(textarea.value).toBe('> hello world\n\n');
+		expect(textarea).toHaveValue('> hello world\n\n');
 	});
 
 	it('calls uploadFile with expected options on save', async () => {
@@ -62,6 +62,10 @@ describe('NoteComposer', () => {
 			expect(mockUploadFile).toHaveBeenCalledTimes(1);
 		});
 		const lastCall = mockUploadFile.mock.calls.at(-1);
+		if (!lastCall) {
+			throw new Error('uploadFile was not called');
+		}
+
 		const [filename, content, options] = lastCall;
 		expect(filename).toMatch(/^note-\d+\.md$/v);
 		expect(content).toBe('> snip\n\nmy thoughts');
@@ -84,6 +88,10 @@ describe('NoteComposer', () => {
 			expect(mockUploadFile).toHaveBeenCalledTimes(1);
 		});
 		const lastCall = mockUploadFile.mock.calls.at(-1);
+		if (!lastCall) {
+			throw new Error('uploadFile was not called');
+		}
+
 		const options = lastCall[2];
 		expect(options).toMatchObject({
 			title: 'Note',

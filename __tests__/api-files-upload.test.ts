@@ -69,7 +69,12 @@ function jsonRequest(url: string, body: Record<string, unknown>) {
 
 function getLastCreateFileCall(): CreateFileArgs {
 	const {calls} = mockCreateFileWithChunks.mock;
-	return calls.at(-1)[0];
+	const lastCall = calls.at(-1);
+	if (!lastCall) {
+		throw new Error('createFileWithChunks was not called');
+	}
+
+	return lastCall[0];
 }
 
 beforeEach(() => {
