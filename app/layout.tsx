@@ -30,12 +30,14 @@ export default async function RootLayout({
 				<SidebarProvider session={session}>
 					<div className='flex flex-col h-dvh'>
 						<Navbar />
-						{session && <RecentlyViewedBar />}
 						<div className='flex flex-row flex-1 overflow-hidden'>
 							{session && <Sidebar />}
-							<main className='flex-1 overflow-auto relative'>
-								{children}
-							</main>
+							<div className='flex flex-col flex-1 overflow-hidden'>
+								{session && <RecentlyViewedBar />}
+								<main className='flex-1 overflow-auto relative'>
+									{children}
+								</main>
+							</div>
 						</div>
 					</div>
 				</SidebarProvider>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/strict-void-return */
 'use client';
 
 import {
@@ -8,7 +9,7 @@ import Link from 'next/link';
 import cx from 'classnames';
 import Fuse from 'fuse.js';
 import {useParams, usePathname} from 'next/navigation';
-import {FilePlusCorner, MessageCirclePlus} from 'lucide-react';
+import {FilePlusCorner, LogOut, MessageCirclePlus} from 'lucide-react';
 import {useSidebar} from './sidebar-context';
 import {NoteComposer} from './note-composer';
 import {
@@ -20,6 +21,7 @@ import {
 	UncheckedSquare,
 	UploadIcon,
 } from './icons';
+import {logout} from '@/app/(auth)/actions';
 import {type AppError, fetcher} from '@/utils/functions';
 import {type Chat} from '@/schema';
 
@@ -383,6 +385,13 @@ export const Sidebar = () => {
 						: '-translate-x-full md:translate-x-0',
 				)}
 			>
+				{/* Title */}
+				<div className='px-3 py-3 border-b dark:border-zinc-700'>
+					<div className='text-base font-semibold text-zinc-900 dark:text-zinc-100'>
+						Wiki Chat
+					</div>
+				</div>
+
 				{/* Top: tabs + actions */}
 				<div className='p-3 flex flex-row items-center justify-between border-b dark:border-zinc-700'>
 					<div className='flex flex-row gap-1'>
@@ -509,11 +518,21 @@ export const Sidebar = () => {
 						)}
 				</div>
 
-				{/* Bottom: selection count */}
-				<div className='p-3 border-t dark:border-zinc-700'>
+				{/* Bottom: selection count + logout */}
+				<div className='p-3 border-t dark:border-zinc-700 flex flex-row items-center justify-between'>
 					<div className='text-zinc-500 dark:text-zinc-400 text-sm'>
 						{selectedFileIds.length}/{files?.length ?? 0} Selected
 					</div>
+					<form action={logout}>
+						<button
+							type='submit'
+							aria-label='Sign out'
+							title='Sign out'
+							className='dark:text-zinc-400 dark:bg-zinc-700 hover:dark:bg-zinc-600 bg-zinc-100 hover:bg-zinc-200 p-1.5 rounded-md cursor-pointer'
+						>
+							<LogOut size={14} />
+						</button>
+					</form>
 				</div>
 			</aside>
 
