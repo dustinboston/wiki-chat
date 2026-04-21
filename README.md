@@ -7,9 +7,12 @@ A RAG (Retrieval-Augmented Generation) chat application that lets users upload d
 ## Features
 
 - Upload PDF or text documents and chat with their contents
-- RAG pipeline with HyDE (Hypothetical Document Embedding) for improved retrieval
-- Cosine similarity search over document embeddings
+- RAG pipeline with HyDE (Hypothetical Document Embedding) and pgvector-backed cosine similarity search
 - LLM-generated titles for uploaded documents and chat responses
+- Save assistant replies as generated notes, write standalone or article-attached notes, and anchor notes to highlighted passages
+- Full-page notes at `/notes/[id]` with a Recently Viewed bar, inline editing, and an "Expand" modal chat for developing sparse notes into full articles
+- Provenance tracking: each generated note remembers the source chunks it was derived from
+- Soft-delete and audit logging for destructive operations
 - Shareable file selections via URL query parameters
 - Email/password authentication via NextAuth
 
@@ -54,7 +57,9 @@ pnpm db:push       # Push schema directly (dev only, skips migrations)
 pnpm dev       # Start development server
 pnpm build     # Production build
 pnpm start     # Start production server
-pnpm lint      # Run ESLint
+pnpm lint      # Run xo
+pnpm lint:fix  # Run xo --fix
+pnpm test      # Run vitest
 ```
 
 ## Architecture
@@ -71,18 +76,22 @@ pnpm lint      # Run ESLint
 ### Schema
 
 - **User** — email/password authentication
-- **File** — uploaded documents with auto-increment `id`, `pathname`, LLM-generated `title`, and `userEmail`
-- **Chunk** — text chunks belonging to a File, each with an embedding vector
-- **Chat** — conversation history stored as JSON messages
+- **File** — documents with auto-increment `id`, `pathname`, LLM-generated `title`, `userEmail`, `sourceType` (`'upload'` | `'manual'` | `'generated'`), and `deletedAt` for soft-delete
+- **Chunk** — text chunks belonging to a File, each with a `vector(1536)` embedding backed by an HNSW cosine index
+- **FileSource** — lineage between a generated/note File and the source Chunks it was derived from; `quotedText` optionally anchors the relationship to a highlighted passage
+- **Chat** — conversation history stored as JSON messages, with `deletedAt` for soft-delete
+- **AuditLog** — records destructive actions (`delete_chat`, `delete_file`, `replace_file_content`) with actor, timestamp, and resource info
 
 ### RAG Pipeline
 
-The RAG logic lives in `ai/rag-middleware.ts` and runs as middleware on every chat request:
+The RAG logic lives in `ai/rag.ts` and runs on every chat request:
 
 1. **Classification** — A fast model (GPT-4o-mini) classifies the user message as a question, statement, or other. Only questions trigger RAG.
 2. **Hypothetical Document Embedding (HyDE)** — GPT-4o-mini generates a hypothetical answer to the question, which is then embedded. This produces better retrieval than embedding the question directly.
-3. **Retrieval** — All chunks from the user's selected files are fetched. Each chunk's embedding is compared to the hypothetical answer embedding via cosine similarity. The top 10 chunks are selected.
-4. **Augmented Generation** — The top chunks are injected into the user's message as context. GPT-4o generates the final answer.
+3. **Retrieval** — The top chunks across the user's selected files are retrieved via pgvector cosine similarity in SQL (HNSW index on `Chunk.embedding`), so similarity runs in the database rather than streaming every chunk into Node.
+4. **Augmented Generation** — The top chunks are injected into the user's message as context. GPT-4o generates the final answer, and source chunk metadata is attached to the assistant message for provenance.
+
+When the chat request includes a `noteContext` (from the note-expander modal), RAG is skipped: the note's title and full content are injected as a system-adjacent message, and the resulting conversation is not persisted.
 
 ### Document Upload Flow
 
@@ -101,6 +110,15 @@ The system prompt instructs the LLM to return responses in a structured format:
 - **Line 3+:** The actual response content
 
 The title is stripped from the displayed message and used when saving responses as documents.
+
+### Notes
+
+Notes are stored as regular `File` rows with `sourceType` of `'manual'` (user-written) or `'generated'` (saved from an assistant reply). They share the chunk + embedding pipeline so they participate in retrieval alongside uploaded documents.
+
+- **Creating notes** — from the sidebar composer (standalone), from a note-attached-to-an-article composer, from a text selection inside a note page (highlight-anchored note), or by clicking *Add to Library* on an assistant reply.
+- **Lineage** — `FileSource` links a generated note back to the source chunks; `FileSource.quotedText` additionally anchors a manual note to a highlighted passage, which is rendered as a `<mark>` in the parent note.
+- **Viewing** — `/notes/[id]` renders the note, its provenance (sources, derived notes, attached notes), and a Recently Viewed bar populated from `localStorage`.
+- **Editing / expanding / overwriting** — inline edit, a full "Expand" modal chat seeded with the current note as context, and an "Overwrite Note" button on expander replies. All three paths go through `PATCH /api/files/content`, which re-chunks, re-embeds, and writes an audit log entry (`replace_file_content`). Uploaded PDFs (`sourceType: 'upload'`) are read-only.
 
 ### URL-Based Selection State
 
