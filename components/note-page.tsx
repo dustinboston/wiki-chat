@@ -5,6 +5,7 @@ import {
 } from 'react';
 import {useRouter} from 'next/navigation';
 import useSWR, {mutate} from 'swr';
+import {Bot, FilePlusCorner} from 'lucide-react';
 import {fileContentSchema} from './sidebar-context';
 import {LoaderIcon, PencilEditIcon, TrashIcon} from './icons';
 import {NoteComposer} from './note-composer';
@@ -416,9 +417,14 @@ export function NotePage({fileId}: {fileId: number}) {
 										onClick={() => {
 											setComposerState({});
 										}}
-										className='text-sm px-3 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-50 transition-colors'
+										title='New note'
+										aria-label='New note'
+										className={
+											'p-1.5 rounded-md cursor-pointer transition-colors '
+											+ 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 dark:hover:text-zinc-200 dark:hover:bg-zinc-700'
+										}
 									>
-										Note
+										<FilePlusCorner size={16} />
 									</button>
 									{canExpand && (
 										<button
@@ -426,9 +432,14 @@ export function NotePage({fileId}: {fileId: number}) {
 											onClick={() => {
 												setIsExpanderOpen(true);
 											}}
-											className='text-sm px-3 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-50 transition-colors'
+											title='Expand with AI'
+											aria-label='Expand with AI'
+											className={
+												'p-1.5 rounded-md cursor-pointer transition-colors '
+												+ 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 dark:hover:text-zinc-200 dark:hover:bg-zinc-700'
+											}
 										>
-											Expand
+											<Bot size={16} />
 										</button>
 									)}
 									{canEdit && (

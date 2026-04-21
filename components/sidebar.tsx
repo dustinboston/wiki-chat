@@ -8,6 +8,7 @@ import Link from 'next/link';
 import cx from 'classnames';
 import Fuse from 'fuse.js';
 import {useParams, usePathname} from 'next/navigation';
+import {FilePlusCorner, MessageCirclePlus} from 'lucide-react';
 import {useSidebar} from './sidebar-context';
 import {NoteComposer} from './note-composer';
 import {
@@ -15,7 +16,6 @@ import {
 	ChevronRightIcon,
 	InfoIcon,
 	LoaderIcon,
-	PencilEditIcon,
 	TrashIcon,
 	UncheckedSquare,
 	UploadIcon,
@@ -449,18 +449,20 @@ export const Sidebar = () => {
 							onClick={() => {
 								setIsNoteComposerOpen(true);
 							}}
-							className='dark:text-zinc-400 dark:bg-zinc-700 hover:dark:bg-zinc-600 bg-zinc-100 hover:bg-zinc-200 px-2 py-1 rounded-md cursor-pointer text-xs font-semibold'
+							className='dark:text-zinc-400 dark:bg-zinc-700 hover:dark:bg-zinc-600 bg-zinc-100 hover:bg-zinc-200 p-1.5 rounded-md cursor-pointer'
 							title='New note'
+							aria-label='New note'
 						>
-							+ Note
+							<FilePlusCorner size={14} />
 						</button>
 						<Link
 							href='/'
 							className='dark:text-zinc-400 dark:bg-zinc-700 hover:dark:bg-zinc-600 bg-zinc-100 hover:bg-zinc-200 p-1.5 rounded-md cursor-pointer'
 							onClick={closeSidebar}
 							title='New chat'
+							aria-label='New chat'
 						>
-							<PencilEditIcon size={14} />
+							<MessageCirclePlus size={14} />
 						</Link>
 					</div>
 				</div>
