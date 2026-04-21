@@ -153,6 +153,7 @@ export function Chat({
 			title: title || undefined,
 			sourceType: 'generated',
 			sourceChunks: sources.length > 0 ? sources : undefined,
+			parentFileId: noteContext?.fileId,
 		});
 		return result !== null;
 	};

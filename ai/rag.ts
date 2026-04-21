@@ -13,6 +13,9 @@ export type RagResult = {
 	sources: SourceChunk[];
 };
 
+// Drop chunks below this cosine similarity to the HyDE answer; weak matches were polluting context.
+const MIN_SIMILARITY = 0.4;
+
 export async function retrieveAndAugment({
 	messages,
 	fileIds,
@@ -67,11 +70,17 @@ export async function retrieveAndAugment({
 		value: hypotheticalAnswer,
 	});
 
-	const topKChunks = await getTopChunksForFileIds({
+	const candidateChunks = await getTopChunksForFileIds({
 		fileIds,
 		queryEmbedding: hypotheticalAnswerEmbedding,
 		limit: 10,
 	});
+	const topKChunks = candidateChunks.filter((c) => c.similarity >= MIN_SIMILARITY);
+
+	if (topKChunks.length === 0) {
+		augmented.push(recentMessage);
+		return { messages: augmented, sources: [] };
+	}
 
 	augmented.push({
 		role: 'user',
