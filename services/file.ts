@@ -1,7 +1,11 @@
+import {openai} from '@ai-sdk/openai';
+import {RecursiveCharacterTextSplitter} from '@langchain/textsplitters';
+import {embedMany} from 'ai';
 import {
 	createFile as dbCreateFile,
 	insertChunks as dbInsertChunks,
 	insertFileSources as dbInsertFileSources,
+	deleteChunksByFileId as dbDeleteChunksByFileId,
 	getChunksByFileIds,
 	getFilesByUser,
 	getFileById,
@@ -71,6 +75,53 @@ export async function getFileContent({id, userEmail}: {id: number; userEmail: st
 
 	const chunks = await getChunksByFileIds({fileIds: [id]});
 	return {file, chunks};
+}
+
+export async function replaceFileContent({
+	id,
+	userEmail,
+	content,
+}: {
+	id: number;
+	userEmail: string;
+	content: string;
+}) {
+	const file = await getFileById({id});
+	if (!file || file.userEmail !== userEmail) {
+		return {ok: false, reason: 'not_found'} as const;
+	}
+
+	if (file.sourceType !== 'manual' && file.sourceType !== 'generated') {
+		return {ok: false, reason: 'forbidden_source_type'} as const;
+	}
+
+	const textSplitter = new RecursiveCharacterTextSplitter({chunkSize: 1000});
+	const chunkedContent = await textSplitter.createDocuments([content]);
+
+	const {embeddings} = await embedMany({
+		model: openai.embedding('text-embedding-3-small'),
+		values: chunkedContent.map(c => c.pageContent),
+	});
+
+	await dbDeleteChunksByFileId({fileId: id});
+
+	await dbInsertChunks({
+		chunks: chunkedContent.map((c, i) => ({
+			id: `${id}/${Date.now()}/${i}`,
+			fileId: id,
+			content: c.pageContent,
+			embedding: embeddings[i],
+		})),
+	});
+
+	await insertAuditLog({
+		actor: userEmail,
+		action: 'replace_file_content',
+		resourceType: 'File',
+		resourceId: String(id),
+	});
+
+	return {ok: true} as const;
 }
 
 export async function deleteFile({id, userEmail}: {id: number; userEmail: string}) {

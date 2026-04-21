@@ -2,10 +2,9 @@ import {
 	describe, it, expect, vi,
 } from 'vitest';
 import {render, fireEvent} from '@testing-library/react';
-import {HighlightedBody, computeHighlightSpans} from '@/components/file-viewer';
+import {HighlightedBody, computeHighlightSpans} from '@/components/note-page';
 
 vi.mock('@/components/sidebar-context', () => ({
-	useSidebar: () => ({viewFile: vi.fn()}),
 	fileContentSchema: {
 		safeParse: () => ({success: false}),
 	},

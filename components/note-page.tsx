@@ -3,11 +3,14 @@
 import {
 	Fragment, useEffect, useRef, useState,
 } from 'react';
+import {useRouter} from 'next/navigation';
 import useSWR from 'swr';
-import {useSidebar} from './sidebar-context';
+import {fileContentSchema} from './sidebar-context';
 import {LoaderIcon} from './icons';
 import {NoteComposer} from './note-composer';
 import {NotePopover} from './note-popover';
+import {NoteExpander} from './note-expander';
+import {pushRecentNote} from '@/hooks/use-recently-viewed';
 import {fetcher} from '@/utils/functions';
 
 type SourceFile = {
@@ -129,7 +132,7 @@ export function HighlightedBody({
 }
 
 function ProvenanceInfo({fileId}: {fileId: number | null}) {
-	const {viewFile} = useSidebar();
+	const router = useRouter();
 	const {data, isLoading} = useSWR<SourcesData>(
 		fileId ? `/api/files/sources?id=${fileId}` : null,
 		fetcher,
@@ -147,6 +150,10 @@ function ProvenanceInfo({fileId}: {fileId: number | null}) {
 		return null;
 	}
 
+	const navigate = (id: number) => {
+		router.push(`/notes/${id}`);
+	};
+
 	return (
 		<div className='flex flex-col gap-2 text-xs text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700 pb-3'>
 			{hasSources && (
@@ -158,7 +165,7 @@ function ProvenanceInfo({fileId}: {fileId: number | null}) {
 								<button
 									type='button'
 									onClick={() => {
-										void viewFile(source.fileId, source.title ?? source.pathname);
+										navigate(source.fileId);
 									}}
 									className='text-left hover:underline'
 								>
@@ -178,7 +185,7 @@ function ProvenanceInfo({fileId}: {fileId: number | null}) {
 								<button
 									type='button'
 									onClick={() => {
-										void viewFile(d.fileId, d.title ?? d.pathname);
+										navigate(d.fileId);
 									}}
 									className='text-left hover:underline'
 								>
@@ -198,7 +205,7 @@ function ProvenanceInfo({fileId}: {fileId: number | null}) {
 								<button
 									type='button'
 									onClick={() => {
-										void viewFile(d.fileId, d.title ?? d.pathname);
+										navigate(d.fileId);
 									}}
 									className='text-left hover:underline'
 								>
@@ -219,19 +226,32 @@ type Selection = {
 	left: number;
 };
 
-export function FileViewer() {
-	const {viewingFile, isLoadingFileContent, closeFileViewer} = useSidebar();
+export function NotePage({fileId}: {fileId: number}) {
 	const bodyRef = useRef<HTMLDivElement>(null);
 	const [composerState, setComposerState] = useState<{quotedText?: string} | null>(null);
 	const [selection, setSelection] = useState<Selection | null>(null);
 	const [popoverNoteId, setPopoverNoteId] = useState<number | null>(null);
+	const [isExpanderOpen, setIsExpanderOpen] = useState(false);
 
-	const fileId = viewingFile?.fileId;
-
-	const {data: sourcesData} = useSWR<SourcesData>(
-		fileId === undefined ? null : `/api/files/sources?id=${fileId}`,
+	const {data: noteData, isLoading: isLoadingContent} = useSWR(
+		`/api/files/content?id=${fileId}`,
 		fetcher,
 	);
+	const parsedContent = noteData ? fileContentSchema.safeParse(noteData) : null;
+	const note = parsedContent?.success ? parsedContent.data : null;
+
+	const {data: sourcesData} = useSWR<SourcesData>(
+		`/api/files/sources?id=${fileId}`,
+		fetcher,
+	);
+
+	const label = note?.title ?? note?.pathname;
+
+	useEffect(() => {
+		if (label) {
+			pushRecentNote({fileId, title: label});
+		}
+	}, [fileId, label]);
 
 	useEffect(() => {
 		if (composerState) {
@@ -273,11 +293,8 @@ export function FileViewer() {
 		};
 	}, [composerState]);
 
-	if (!viewingFile && !isLoadingFileContent) {
-		return null;
-	}
-
-	const label = viewingFile?.pathname;
+	const sourceType = note?.sourceType;
+	const canExpand = sourceType === 'manual' || sourceType === 'generated';
 
 	const highlightsInput: Array<{quotedText: string; noteFileId: number}> = [];
 	if (sourcesData) {
@@ -295,34 +312,35 @@ export function FileViewer() {
 	}
 
 	return (
-		<div className='absolute inset-0 z-10 flex flex-row justify-center pb-20 h-full bg-white dark:bg-zinc-900'>
+		<div className='flex flex-row justify-center pb-20 h-full bg-white dark:bg-zinc-900'>
 			<div className='flex flex-col w-full items-center overflow-y-auto'>
-				<div className='flex items-center justify-between w-full md:w-[500px] px-4 md:px-0 pt-20 pb-4 border-b border-gray-800'>
+				<div className='flex items-center justify-between w-full md:w-[500px] px-4 md:px-0 pt-8 pb-4 border-b border-gray-800'>
 					<h2 className='text-lg font-semibold text-zinc-800 dark:text-zinc-200 truncate'>
 						{label ?? 'Loading...'}
 					</h2>
 					<div className='flex flex-row gap-2 flex-shrink-0 ml-4'>
 						<button
 							onClick={() => {
-								if (fileId !== undefined) {
-									setComposerState({});
-								}
+								setComposerState({});
 							}}
-							disabled={fileId === undefined}
-							className='text-sm px-3 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-zinc-600 dark:text-zinc-300 transition-colors disabled:opacity-60 disabled:cursor-not-allowed'
+							className='text-sm px-3 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-zinc-600 dark:text-zinc-300 transition-colors'
 						>
 							Note
 						</button>
-						<button
-							onClick={closeFileViewer}
-							className='text-sm px-3 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-zinc-600 dark:text-zinc-300 transition-colors'
-						>
-							Close
-						</button>
+						{canExpand && (
+							<button
+								onClick={() => {
+									setIsExpanderOpen(true);
+								}}
+								className='text-sm px-3 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-50 transition-colors'
+							>
+								Expand
+							</button>
+						)}
 					</div>
 				</div>
 
-				{isLoadingFileContent
+				{isLoadingContent
 					? (
 						<div className='flex items-center justify-center flex-1 text-zinc-400'>
 							<div className='animate-spin'>
@@ -332,17 +350,17 @@ export function FileViewer() {
 					)
 					: (
 						<div className='flex flex-col gap-4 w-full md:w-[500px] px-4 md:px-0 py-4'>
-							<ProvenanceInfo fileId={fileId ?? null} />
+							<ProvenanceInfo fileId={fileId} />
 							<div ref={bodyRef} className='text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap'>
-								{viewingFile?.content !== undefined && (
+								{note?.content !== undefined && (
 									<HighlightedBody
-										content={viewingFile.content}
+										content={note.content}
 										highlights={highlightsInput}
 										onHighlightClick={setPopoverNoteId}
 									/>
 								)}
 							</div>
-							{viewingFile?.truncated && (
+							{note?.truncated && (
 								<div className='text-xs text-zinc-400 dark:text-zinc-500 italic'>
 									Content truncated to ~5,000 words.
 								</div>
@@ -351,7 +369,7 @@ export function FileViewer() {
 					)}
 			</div>
 
-			{selection && fileId !== undefined && (
+			{selection && (
 				<button
 					type='button'
 					onClick={() => {
@@ -370,7 +388,7 @@ export function FileViewer() {
 				</button>
 			)}
 
-			{composerState && fileId !== undefined && (
+			{composerState && (
 				<NoteComposer
 					parentFileId={fileId}
 					parentLabel={label}
@@ -387,6 +405,19 @@ export function FileViewer() {
 					setPopoverNoteId(null);
 				}}
 			/>
+
+			{isExpanderOpen && canExpand && note && (
+				<NoteExpander
+					noteContext={{
+						fileId,
+						title: label ?? 'Note',
+						content: note.content,
+					}}
+					onClose={() => {
+						setIsExpanderOpen(false);
+					}}
+				/>
+			)}
 		</div>
 	);
 }

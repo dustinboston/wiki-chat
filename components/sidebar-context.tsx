@@ -10,7 +10,7 @@ import {
 	type Dispatch,
 	type SetStateAction,
 } from 'react';
-import {useSearchParams, useRouter, usePathname} from 'next/navigation';
+import {useSearchParams, usePathname} from 'next/navigation';
 import {mutate} from 'swr';
 import {type Session} from 'next-auth';
 import {z} from 'zod';
@@ -21,6 +21,7 @@ export const fileContentSchema = z.object({
 	truncated: z.boolean(),
 	title: z.string().nullable().optional(),
 	pathname: z.string().optional(),
+	sourceType: z.enum(['upload', 'generated', 'manual']).optional(),
 });
 
 const uploadResponseSchema = z.object({
@@ -43,10 +44,6 @@ type SidebarContextType = {
 	toggleSidebar: () => void;
 	uploadQueue: string[];
 	uploadFile: (name: string, content: string | File, options?: UploadOptions) => Promise<number | null>;
-	viewingFile: {fileId: number; pathname: string; content: string; truncated: boolean} | null;
-	isLoadingFileContent: boolean;
-	viewFile: (fileId: number, title: string) => Promise<void>;
-	closeFileViewer: () => void;
 };
 
 const SidebarContext = createContext<SidebarContextType | null>(null);
@@ -68,7 +65,6 @@ export function SidebarProvider({
 	session: Session | null;
 }) {
 	const searchParameters = useSearchParams();
-	const router = useRouter();
 	const pathname = usePathname();
 
 	const [selectedFileIds, setSelectedFileIds] = useState<number[]>(() => {
@@ -77,13 +73,6 @@ export function SidebarProvider({
 	});
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 	const [uploadQueue, setUploadQueue] = useState<string[]>([]);
-	const [viewingFile, setViewingFile] = useState<{
-		fileId: number;
-		pathname: string;
-		content: string;
-		truncated: boolean;
-	} | null>(null);
-	const [isLoadingFileContent, setIsLoadingFileContent] = useState(false);
 
 	// Sync selectedFileIds to URL query params
 	useEffect(() => {
@@ -97,26 +86,6 @@ export function SidebarProvider({
 		const newUrl = qs ? `${pathname}?${qs}` : pathname;
 		globalThis.history.replaceState({}, '', newUrl);
 	}, [selectedFileIds, pathname, searchParameters]);
-
-	const viewFile = useCallback(async (fileId: number, title: string) => {
-		setIsLoadingFileContent(true);
-		try {
-			const response = await fetch(`/api/files/content?id=${fileId}`);
-			if (response.ok) {
-				const json: unknown = await response.json();
-				const data = fileContentSchema.parse(json);
-				setViewingFile({
-					fileId, pathname: title, content: data.content, truncated: data.truncated,
-				});
-			}
-		} finally {
-			setIsLoadingFileContent(false);
-		}
-	}, []);
-
-	const closeFileViewer = useCallback(() => {
-		setViewingFile(null);
-	}, []);
 
 	const uploadFile = useCallback(
 		async (name: string, content: string | File, options?: UploadOptions): Promise<number | null> => {
@@ -195,10 +164,6 @@ export function SidebarProvider({
 				},
 				uploadQueue,
 				uploadFile,
-				viewingFile,
-				isLoadingFileContent,
-				viewFile,
-				closeFileViewer,
 			}}
 		>
 			{children}

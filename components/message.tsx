@@ -18,9 +18,72 @@ type MessageProps = {
 	sources?: AggregatedSource[];
 	isStreaming?: boolean;
 	onSaveMessage: (index: number) => Promise<boolean>;
+	onOverwriteNote?: (index: number) => Promise<boolean>;
 };
 
 type SaveStatus = 'idle' | 'loading' | 'done';
+
+type OverwriteStatus = 'idle' | 'confirming' | 'loading' | 'done' | 'error';
+
+function OverwriteNoteButton({id, onOverwriteNote}: {
+	id: number;
+	onOverwriteNote: (index: number) => Promise<boolean>;
+}) {
+	const [status, setStatus] = useState<OverwriteStatus>('idle');
+
+	if (status === 'confirming') {
+		return (
+			<span className='inline-flex items-center gap-1 text-xs'>
+				<span className='text-zinc-600 dark:text-zinc-400'>Overwrite note?</span>
+				<button
+					type='button'
+					onClick={() => {
+						setStatus('loading');
+						onOverwriteNote(id).then(ok => {
+							setStatus(ok ? 'done' : 'error');
+						}).catch(() => {
+							setStatus('error');
+						});
+					}}
+					className='bg-red-600 hover:bg-red-500 text-zinc-50 px-2 py-1 rounded-sm transition-colors'
+				>
+					Yes, overwrite
+				</button>
+				<button
+					type='button'
+					onClick={() => {
+						setStatus('idle');
+					}}
+					className='bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-zinc-800 dark:text-zinc-200 px-2 py-1 rounded-sm transition-colors'
+				>
+					Cancel
+				</button>
+			</span>
+		);
+	}
+
+	const labelByStatus: Record<OverwriteStatus, string> = {
+		idle: 'Overwrite Note',
+		confirming: 'Overwrite Note',
+		loading: 'Overwriting…',
+		done: 'Overwritten',
+		error: 'Failed — retry',
+	};
+	const label = labelByStatus[status];
+
+	return (
+		<button
+			type='button'
+			disabled={status === 'loading' || status === 'done'}
+			onClick={() => {
+				setStatus('confirming');
+			}}
+			className='bg-zinc-800 hover:bg-zinc-700 text-zinc-50 text-xs px-2 py-1 rounded-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-zinc-800'
+		>
+			{label}
+		</button>
+	);
+}
 
 function SaveToLibraryButton({id, onSaveMessage}: {
 	id: number;
@@ -87,7 +150,7 @@ function SourcesList({sources}: {sources: AggregatedSource[]}) {
 	);
 }
 
-export const Message = ({id, role, content, sources = [], isStreaming = false, onSaveMessage}: MessageProps) => (
+export const Message = ({id, role, content, sources = [], isStreaming = false, onSaveMessage, onOverwriteNote}: MessageProps) => (
 	<motion.div
 		className={'flex flex-row gap-4 px-4 mb-2 pb-5 w-full md:w-[500px] md:px-0 first-of-type:pt-20 border-b border-gray-800'}
 		initial={{y: 5, opacity: 0}}
@@ -106,7 +169,10 @@ export const Message = ({id, role, content, sources = [], isStreaming = false, o
 				<div className='flex flex-col gap-2'>
 					<SourcesList sources={sources} />
 					{!isStreaming && (
-						<form className='text-right'>
+						<form className='text-right flex flex-row justify-end gap-2'>
+							{onOverwriteNote && (
+								<OverwriteNoteButton id={id} onOverwriteNote={onOverwriteNote} />
+							)}
 							<SaveToLibraryButton id={id} onSaveMessage={onSaveMessage} />
 						</form>
 					)}

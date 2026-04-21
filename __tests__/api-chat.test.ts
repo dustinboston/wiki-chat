@@ -4,13 +4,14 @@ import {
 import {type Session} from 'next-auth';
 import {POST as postChat} from '@/app/(chat)/api/chat/route';
 
-const {mockAuth, mockStreamText, mockSaveMessage, mockRetrieveAndAugment, mockCreateDataStreamResponse, mockListFiles} = vi.hoisted(() => ({
+const {mockAuth, mockStreamText, mockSaveMessage, mockRetrieveAndAugment, mockCreateDataStreamResponse, mockListFiles, mockGetFile} = vi.hoisted(() => ({
 	mockAuth: vi.fn(),
 	mockStreamText: vi.fn(),
 	mockSaveMessage: vi.fn(),
 	mockRetrieveAndAugment: vi.fn(),
 	mockCreateDataStreamResponse: vi.fn(),
 	mockListFiles: vi.fn(),
+	mockGetFile: vi.fn(),
 }));
 
 vi.mock('@/app/(auth)/auth', () => ({
@@ -23,6 +24,7 @@ vi.mock('@/services/chat', () => ({
 
 vi.mock('@/services/file', () => ({
 	listFiles: mockListFiles,
+	getFile: mockGetFile,
 }));
 
 vi.mock('@/ai/rag', () => ({
@@ -197,6 +199,91 @@ describe('POST /api/chat', () => {
 				annotations: [{sources}],
 			}],
 			author: 'a@b.com',
+		});
+	});
+
+	describe('with noteContext', () => {
+		it('rejects when the note is not owned by the user', async () => {
+			mockAuth.mockResolvedValue(mockSession('a@b.com'));
+			mockGetFile.mockResolvedValue({id: 42, userEmail: 'someone-else@b.com', sourceType: 'manual'});
+
+			const request = new Request('http://localhost/api/chat', {
+				method: 'POST',
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify({
+					id: 'chat-1',
+					messages: [{role: 'user', content: 'expand'}],
+					selectedFileIds: [],
+					noteContext: {fileId: 42, title: 'My Note', content: 'tiny note'},
+				}),
+			});
+
+			const response = await postChat(request);
+			expect(response.status).toBe(403);
+			expect(mockRetrieveAndAugment).not.toHaveBeenCalled();
+		});
+
+		it('rejects when the file sourceType is upload', async () => {
+			mockAuth.mockResolvedValue(mockSession('a@b.com'));
+			mockGetFile.mockResolvedValue({id: 42, userEmail: 'a@b.com', sourceType: 'upload'});
+
+			const request = new Request('http://localhost/api/chat', {
+				method: 'POST',
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify({
+					id: 'chat-1',
+					messages: [{role: 'user', content: 'expand'}],
+					selectedFileIds: [],
+					noteContext: {fileId: 42, title: 'PDF', content: 'some content'},
+				}),
+			});
+
+			const response = await postChat(request);
+			expect(response.status).toBe(403);
+		});
+
+		it('skips RAG, injects note context as system message, and skips persistence on finish', async () => {
+			mockAuth.mockResolvedValue(mockSession('a@b.com'));
+			mockGetFile.mockResolvedValue({id: 42, userEmail: 'a@b.com', sourceType: 'manual'});
+
+			type CapturedMessage = {role: string; content: string};
+			let capturedOnFinish: ((arguments_: {text: string}) => Promise<void>) | undefined;
+			let capturedMessages: CapturedMessage[] | undefined;
+			mockStreamText.mockImplementation((options: {
+				onFinish?: (arguments_: {text: string}) => Promise<void>;
+				messages: CapturedMessage[];
+			}) => {
+				capturedOnFinish = options.onFinish;
+				capturedMessages = options.messages;
+				return {mergeIntoDataStream: vi.fn()};
+			});
+
+			const messages = [{role: 'user', content: 'expand this'}];
+			const request = new Request('http://localhost/api/chat', {
+				method: 'POST',
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify({
+					id: 'chat-1',
+					messages,
+					selectedFileIds: [],
+					noteContext: {fileId: 42, title: 'Tim Berners-Lee', content: 'Invented the web.'},
+				}),
+			});
+
+			await postChat(request);
+
+			expect(mockRetrieveAndAugment).not.toHaveBeenCalled();
+			expect(capturedMessages).toBeDefined();
+			const first = capturedMessages?.[0];
+			expect(first?.role).toBe('system');
+			expect(first?.content).toContain('Tim Berners-Lee');
+			expect(first?.content).toContain('Invented the web.');
+
+			if (capturedOnFinish) {
+				await capturedOnFinish({text: 'Expanded article about TBL.'});
+			}
+
+			expect(mockSaveMessage).not.toHaveBeenCalled();
 		});
 	});
 });

@@ -1,4 +1,5 @@
 import {
+	type CoreMessage,
 	type Message,
 	convertToCoreMessages,
 	createDataStreamResponse,
@@ -8,7 +9,7 @@ import {z} from 'zod';
 import {openai} from '@ai-sdk/openai';
 import {auth} from '@/app/(auth)/auth';
 import {saveMessage} from '@/services/chat';
-import {listFiles} from '@/services/file';
+import {listFiles, getFile} from '@/services/file';
 import {retrieveAndAugment} from '@/ai/rag';
 
 function isMessage(item: unknown): item is Message {
@@ -26,6 +27,11 @@ const chatRequestSchema = z.object({
 	id: z.string(),
 	messages: z.custom<Message[]>(isMessageArray),
 	selectedFileIds: z.array(z.number()),
+	noteContext: z.object({
+		fileId: z.number().int().positive(),
+		title: z.string(),
+		content: z.string(),
+	}).optional(),
 });
 
 const system = `
@@ -56,7 +62,7 @@ IMPORTANT: Always format your response as follows:
  */
 export async function POST(request: Request) {
 	const json: unknown = await request.json();
-	const {id, messages, selectedFileIds} = chatRequestSchema.parse(json);
+	const {id, messages, selectedFileIds, noteContext} = chatRequestSchema.parse(json);
 
 	const session = await auth();
 
@@ -66,22 +72,42 @@ export async function POST(request: Request) {
 
 	const userEmail = session.user.email;
 
-	// When no files are explicitly selected, query across all of the user's files.
-	let fileIds = selectedFileIds;
-	if (fileIds.length === 0) {
-		const userFiles = await listFiles({email: userEmail});
-		fileIds = userFiles.map(f => f.id);
-	}
+	let augmentedMessages: CoreMessage[];
+	let sources: Awaited<ReturnType<typeof retrieveAndAugment>>['sources'] = [];
 
-	// Run RAG retrieval to get augmented messages and source chunks
-	const {messages: augmentedMessages, sources} = await retrieveAndAugment({
-		messages: convertToCoreMessages(messages),
-		fileIds,
-	});
+	if (noteContext) {
+		const noteFile = await getFile({id: noteContext.fileId});
+		if (!noteFile || noteFile.userEmail !== userEmail) {
+			return new Response('Forbidden', {status: 403});
+		}
+
+		if (noteFile.sourceType !== 'manual' && noteFile.sourceType !== 'generated') {
+			return new Response('Note context is only allowed for notes and generated files', {status: 403});
+		}
+
+		const contextPrefix: CoreMessage = {
+			role: 'system',
+			content: `The user is working on the note titled "${noteContext.title}". Its current contents are:\n\n${noteContext.content}\n\nWhen asked to expand, rewrite, or generate, produce a new complete note body that could replace the current contents.`,
+		};
+		augmentedMessages = [contextPrefix, ...convertToCoreMessages(messages)];
+	} else {
+		// When no files are explicitly selected, query across all of the user's files.
+		let fileIds = selectedFileIds;
+		if (fileIds.length === 0) {
+			const userFiles = await listFiles({email: userEmail});
+			fileIds = userFiles.map(f => f.id);
+		}
+
+		const ragResult = await retrieveAndAugment({
+			messages: convertToCoreMessages(messages),
+			fileIds,
+		});
+		augmentedMessages = ragResult.messages;
+		sources = ragResult.sources;
+	}
 
 	return createDataStreamResponse({
 		execute(dataStream) {
-			// Write source annotations so the client can display them
 			if (sources.length > 0) {
 				dataStream.writeMessageAnnotation({sources});
 			}
@@ -92,6 +118,10 @@ export async function POST(request: Request) {
 				system,
 				messages: augmentedMessages,
 				async onFinish({text}) {
+					if (noteContext) {
+						return;
+					}
+
 					await saveMessage({
 						id,
 						messages: [

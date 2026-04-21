@@ -13,7 +13,7 @@ import {
 	index,
 } from 'drizzle-orm/pg-core';
 
-export type AuditAction = 'delete_chat' | 'delete_file';
+export type AuditAction = 'delete_chat' | 'delete_file' | 'replace_file_content';
 
 export type FileSourceType = 'upload' | 'generated' | 'manual';
 

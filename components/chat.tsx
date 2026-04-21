@@ -59,6 +59,19 @@ const suggestedActions = [
 	},
 ];
 
+const noteSuggestedActions = [
+	{
+		title: 'Expand this note',
+		label: 'into a full article',
+		action: 'Expand this note into a full article.',
+	},
+	{
+		title: 'Rewrite for clarity',
+		label: 'keeping the same meaning',
+		action: 'Rewrite this note for clarity, keeping the same meaning.',
+	},
+];
+
 type FileEntry = {
 	id: number;
 	pathname: string;
@@ -80,12 +93,24 @@ function aggregateSources(sources: SourceChunk[], fileMap: Map<number, FileEntry
 	return [...map.values()].toSorted((a, b) => b.similarity - a.similarity);
 }
 
+export type NoteContext = {
+	fileId: number;
+	title: string;
+	content: string;
+};
+
 export function Chat({
 	id,
 	initialMessages,
+	noteContext,
+	ephemeral = false,
+	onRequestOverwrite,
 }: {
 	id: string;
 	initialMessages: Message[];
+	noteContext?: NoteContext;
+	ephemeral?: boolean;
+	onRequestOverwrite?: (messageBody: string) => Promise<boolean>;
 }) {
 	const {selectedFileIds, uploadFile} = useSidebar();
 
@@ -96,9 +121,13 @@ export function Chat({
 
 	const {messages, handleSubmit, input, setInput, append, isLoading}
 		= useChat({
-			body: {id, selectedFileIds},
+			body: {id, selectedFileIds, noteContext},
 			initialMessages,
 			onFinish() {
+				if (ephemeral) {
+					return;
+				}
+
 				const parameters = new URLSearchParams();
 				for (const fid of selectedFileIds) {
 					parameters.append('s', String(fid));
@@ -125,6 +154,14 @@ export function Chat({
 		return result !== null;
 	};
 
+	const onOverwriteNote = onRequestOverwrite
+		? async (index: number): Promise<boolean> => {
+			const message = messages[index];
+			const {body} = parseTitle(message.content);
+			return onRequestOverwrite(body);
+		}
+		: undefined;
+
 	return (
 		<div className='flex flex-row justify-center pb-20 h-full bg-white dark:bg-zinc-900'>
 			<div className='flex flex-col justify-between items-center gap-4 w-full'>
@@ -145,6 +182,7 @@ export function Chat({
 							sources={message.role === 'assistant' ? aggregateSources(getMessageSources(message), fileMap) : []}
 							isStreaming={isLoading && index === messages.length - 1 && message.role === 'assistant'}
 							onSaveMessage={onSaveMessage}
+							onOverwriteNote={onOverwriteNote}
 						/>
 					))}
 					<div
@@ -155,7 +193,7 @@ export function Chat({
 
 				{messages.length === 0 && (
 					<div className='grid sm:grid-cols-2 gap-2 w-full px-4 md:px-0 mx-auto md:max-w-[500px]'>
-						{suggestedActions.map((suggestedAction, index) => (
+						{(noteContext ? noteSuggestedActions : suggestedActions).map((suggestedAction, index) => (
 							<motion.div
 								initial={{opacity: 0, y: 20}}
 								animate={{opacity: 1, y: 0}}

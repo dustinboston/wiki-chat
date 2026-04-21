@@ -120,6 +120,20 @@ export async function getChunksByFileIds({
 		.where(inArray(chunk.fileId, fileIds));
 }
 
+export async function deleteChunksByFileId({fileId}: {fileId: number}) {
+	const db = getDb();
+	const chunkIds = await db
+		.select({id: chunk.id})
+		.from(chunk)
+		.where(eq(chunk.fileId, fileId));
+	const ids = chunkIds.map(c => c.id);
+	if (ids.length > 0) {
+		await db.delete(fileSource).where(inArray(fileSource.sourceChunkId, ids));
+	}
+
+	await db.delete(chunk).where(eq(chunk.fileId, fileId));
+}
+
 export async function getTopChunksForFileIds({
 	fileIds,
 	queryEmbedding,

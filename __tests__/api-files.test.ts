@@ -4,16 +4,17 @@ import {
 import {type Session} from 'next-auth';
 import {z} from 'zod';
 import {GET as listFiles} from '@/app/(chat)/api/files/list/route';
-import {GET as getContent} from '@/app/(chat)/api/files/content/route';
+import {GET as getContent, PATCH as patchContent} from '@/app/(chat)/api/files/content/route';
 import {DELETE as deleteFile} from '@/app/(chat)/api/files/delete/route';
 
 const {
-	mockAuth, mockListFiles, mockGetFileContent, mockDeleteFile,
+	mockAuth, mockListFiles, mockGetFileContent, mockDeleteFile, mockReplaceFileContent,
 } = vi.hoisted(() => ({
 	mockAuth: vi.fn(),
 	mockListFiles: vi.fn(),
 	mockGetFileContent: vi.fn(),
 	mockDeleteFile: vi.fn(),
+	mockReplaceFileContent: vi.fn(),
 }));
 
 vi.mock('@/app/(auth)/auth', () => ({
@@ -24,6 +25,7 @@ vi.mock('@/services/file', () => ({
 	listFiles: mockListFiles,
 	getFileContent: mockGetFileContent,
 	deleteFile: mockDeleteFile,
+	replaceFileContent: mockReplaceFileContent,
 }));
 
 function mockSession(email: string): Session {
@@ -155,6 +157,73 @@ describe('GET /api/files/content', () => {
 
 		expect(body.truncated).toBe(true);
 		expect(body.content.split(/\s+/v).length).toBe(5000);
+	});
+});
+
+describe('PATCH /api/files/content', () => {
+	beforeEach(() => vi.clearAllMocks());
+
+	function patchRequest(id: string | null, body: unknown): Request {
+		const url = id === null ? 'http://localhost/api/files/content' : `http://localhost/api/files/content?id=${id}`;
+		return new Request(url, {
+			method: 'PATCH',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify(body),
+		});
+	}
+
+	it('returns 401 when not authenticated', async () => {
+		mockAuth.mockResolvedValue(null);
+		const response = await patchContent(patchRequest('1', {content: 'x'}));
+		expect(response.status).toBe(401);
+	});
+
+	it('returns 400 when no id provided', async () => {
+		mockAuth.mockResolvedValue(mockSession('a@b.com'));
+		const response = await patchContent(patchRequest(null, {content: 'x'}));
+		expect(response.status).toBe(400);
+	});
+
+	it('returns 400 when id is not a number', async () => {
+		mockAuth.mockResolvedValue(mockSession('a@b.com'));
+		const response = await patchContent(patchRequest('abc', {content: 'x'}));
+		expect(response.status).toBe(400);
+	});
+
+	it('returns 400 when content is empty', async () => {
+		mockAuth.mockResolvedValue(mockSession('a@b.com'));
+		const response = await patchContent(patchRequest('1', {content: ''}));
+		expect(response.status).toBe(400);
+	});
+
+	it('returns 404 when service reports not_found', async () => {
+		mockAuth.mockResolvedValue(mockSession('a@b.com'));
+		mockReplaceFileContent.mockResolvedValue({ok: false, reason: 'not_found'});
+		const response = await patchContent(patchRequest('1', {content: 'new content'}));
+		expect(response.status).toBe(404);
+	});
+
+	it('returns 403 when service reports forbidden source type', async () => {
+		mockAuth.mockResolvedValue(mockSession('a@b.com'));
+		mockReplaceFileContent.mockResolvedValue({ok: false, reason: 'forbidden_source_type'});
+		const response = await patchContent(patchRequest('1', {content: 'new content'}));
+		expect(response.status).toBe(403);
+	});
+
+	it('returns ok on success and calls service with correct args', async () => {
+		mockAuth.mockResolvedValue(mockSession('a@b.com'));
+		mockReplaceFileContent.mockResolvedValue({ok: true});
+
+		const response = await patchContent(patchRequest('42', {content: 'new body text'}));
+		const body: unknown = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body).toEqual({ok: true});
+		expect(mockReplaceFileContent).toHaveBeenCalledWith({
+			id: 42,
+			userEmail: 'a@b.com',
+			content: 'new body text',
+		});
 	});
 });
 

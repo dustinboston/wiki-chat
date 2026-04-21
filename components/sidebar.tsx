@@ -7,7 +7,7 @@ import useSWR from 'swr';
 import Link from 'next/link';
 import cx from 'classnames';
 import Fuse from 'fuse.js';
-import {useParams, usePathname} from 'next/navigation';
+import {useParams, usePathname, useRouter} from 'next/navigation';
 import {useSidebar} from './sidebar-context';
 import {NoteComposer} from './note-composer';
 import {
@@ -322,8 +322,8 @@ export const Sidebar = () => {
 		setIsSidebarOpen,
 		uploadQueue,
 		uploadFile,
-		viewFile,
 	} = useSidebar();
+	const router = useRouter();
 
 	const [activeTab, setActiveTab] = useState<'files' | 'history'>('files');
 	const [searchQuery, setSearchQuery] = useState('');
@@ -555,8 +555,8 @@ export const Sidebar = () => {
 								uploadQueue={uploadQueue}
 								onToggleSelect={handleToggleFileSelect}
 								onDelete={handleDeleteFile}
-								onView={(id, name) => {
-									void viewFile(id, name);
+								onView={id => {
+									router.push(`/notes/${id}`);
 								}}
 							/>
 						)
