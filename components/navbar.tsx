@@ -1,7 +1,7 @@
-import {SidebarToggle} from './sidebar-toggle';
+import { SidebarToggle } from './sidebar-toggle';
 
 export const Navbar = () => (
-	<div className='md:hidden bg-white w-full border-b dark:border-zinc-800 py-2 px-3 flex flex-row items-center dark:bg-zinc-900 z-30'>
+	<div className="z-30 flex w-full flex-row items-center border-b bg-white px-3 py-2 md:hidden dark:border-zinc-800 dark:bg-zinc-900">
 		<SidebarToggle />
 	</div>
 );

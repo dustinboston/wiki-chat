@@ -1,14 +1,27 @@
-import {type Message} from 'ai';
-import {drizzle, type PostgresJsDatabase} from 'drizzle-orm/postgres-js';
+import type { Message } from 'ai';
 import {
-	and, cosineDistance, desc, eq, inArray, isNull, sql, type InferInsertModel,
+	and,
+	cosineDistance,
+	desc,
+	eq,
+	type InferInsertModel,
+	inArray,
+	isNull,
+	sql,
 } from 'drizzle-orm';
+import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+import { env } from '@/app/env';
 import {
-	auditLog, chat, chunk, file, fileSource, user,
-	type AuditAction, type FileSourceType,
+	type AuditAction,
+	auditLog,
+	chat,
+	chunk,
+	type FileSourceType,
+	file,
+	fileSource,
+	user,
 } from '@/schema';
-import {env} from '@/app/env';
 
 let client: ReturnType<typeof postgres> | null = null;
 let db: PostgresJsDatabase | null = null;
@@ -27,7 +40,7 @@ export async function getUser(email: string) {
 }
 
 export async function createUser(email: string, hashedPassword: string) {
-	return getDb().insert(user).values({email, password: hashedPassword});
+	return getDb().insert(user).values({ email, password: hashedPassword });
 }
 
 export async function createMessage({
@@ -58,7 +71,7 @@ export async function createMessage({
 	});
 }
 
-export async function getChatsByUser({email}: {email: string}) {
+export async function getChatsByUser({ email }: { email: string }) {
 	return getDb()
 		.select()
 		.from(chat)
@@ -66,7 +79,7 @@ export async function getChatsByUser({email}: {email: string}) {
 		.orderBy(desc(chat.createdAt));
 }
 
-export async function getChatById({id}: {id: string}) {
+export async function getChatById({ id }: { id: string }) {
 	const [selectedChat] = await getDb()
 		.select()
 		.from(chat)
@@ -74,11 +87,8 @@ export async function getChatById({id}: {id: string}) {
 	return selectedChat;
 }
 
-export async function deleteChatById({id}: {id: string}) {
-	return getDb()
-		.update(chat)
-		.set({deletedAt: new Date()})
-		.where(eq(chat.id, id));
+export async function deleteChatById({ id }: { id: string }) {
+	return getDb().update(chat).set({ deletedAt: new Date() }).where(eq(chat.id, id));
 }
 
 export async function createFile({
@@ -95,38 +105,27 @@ export async function createFile({
 	const [inserted] = await getDb()
 		.insert(file)
 		.values({
-			pathname, title, userEmail, sourceType,
+			pathname,
+			title,
+			userEmail,
+			sourceType,
 		})
 		.returning();
 	return inserted;
 }
 
-export async function insertChunks({
-	chunks,
-}: {
-	chunks: Array<InferInsertModel<typeof chunk>>;
-}) {
+export async function insertChunks({ chunks }: { chunks: InferInsertModel<typeof chunk>[] }) {
 	return getDb().insert(chunk).values(chunks);
 }
 
-export async function getChunksByFileIds({
-	fileIds,
-}: {
-	fileIds: number[];
-}) {
-	return getDb()
-		.select()
-		.from(chunk)
-		.where(inArray(chunk.fileId, fileIds));
+export async function getChunksByFileIds({ fileIds }: { fileIds: number[] }) {
+	return getDb().select().from(chunk).where(inArray(chunk.fileId, fileIds));
 }
 
-export async function deleteChunksByFileId({fileId}: {fileId: number}) {
+export async function deleteChunksByFileId({ fileId }: { fileId: number }) {
 	const db = getDb();
-	const chunkIds = await db
-		.select({id: chunk.id})
-		.from(chunk)
-		.where(eq(chunk.fileId, fileId));
-	const ids = chunkIds.map(c => c.id);
+	const chunkIds = await db.select({ id: chunk.id }).from(chunk).where(eq(chunk.fileId, fileId));
+	const ids = chunkIds.map((c) => c.id);
 	if (ids.length > 0) {
 		await db.delete(fileSource).where(inArray(fileSource.sourceChunkId, ids));
 	}
@@ -157,7 +156,7 @@ export async function getTopChunksForFileIds({
 		.limit(limit);
 }
 
-export async function getFilesByUser({email}: {email: string}) {
+export async function getFilesByUser({ email }: { email: string }) {
 	return getDb()
 		.select()
 		.from(file)
@@ -165,7 +164,7 @@ export async function getFilesByUser({email}: {email: string}) {
 		.orderBy(desc(file.createdAt));
 }
 
-export async function getFileById({id}: {id: number}) {
+export async function getFileById({ id }: { id: number }) {
 	const [result] = await getDb()
 		.select()
 		.from(file)
@@ -173,11 +172,8 @@ export async function getFileById({id}: {id: number}) {
 	return result;
 }
 
-export async function deleteFileById({id}: {id: number}) {
-	return getDb()
-		.update(file)
-		.set({deletedAt: new Date()})
-		.where(eq(file.id, id));
+export async function deleteFileById({ id }: { id: number }) {
+	return getDb().update(file).set({ deletedAt: new Date() }).where(eq(file.id, id));
 }
 
 export async function insertFileSources({
@@ -216,7 +212,7 @@ export async function insertAuditLog({
 	});
 }
 
-export async function getSourcesByFileId({fileId}: {fileId: number}) {
+export async function getSourcesByFileId({ fileId }: { fileId: number }) {
 	return getDb()
 		.select({
 			sourceChunkId: fileSource.sourceChunkId,
@@ -232,7 +228,7 @@ export async function getSourcesByFileId({fileId}: {fileId: number}) {
 		.orderBy(desc(fileSource.similarity));
 }
 
-export async function getDerivedFilesByFileId({fileId}: {fileId: number}) {
+export async function getDerivedFilesByFileId({ fileId }: { fileId: number }) {
 	return getDb()
 		.select({
 			derivedFileId: fileSource.fileId,

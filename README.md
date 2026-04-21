@@ -57,8 +57,9 @@ pnpm db:push       # Push schema directly (dev only, skips migrations)
 pnpm dev       # Start development server
 pnpm build     # Production build
 pnpm start     # Start production server
-pnpm lint      # Run xo
-pnpm lint:fix  # Run xo --fix
+pnpm lint      # Run biome check
+pnpm lint:fix  # Run biome check --write
+pnpm format    # Run biome format --write
 pnpm test      # Run vitest
 ```
 

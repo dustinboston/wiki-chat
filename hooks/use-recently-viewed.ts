@@ -1,7 +1,7 @@
 'use client';
 
-import {useCallback, useEffect, useState} from 'react';
-import {z} from 'zod';
+import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 
 const STORAGE_KEY = 'wiki-chat:recent-notes';
 const UPDATE_EVENT = 'wiki-chat:recent-notes-updated';
@@ -12,10 +12,12 @@ export type RecentNote = {
 	title: string;
 };
 
-const recentSchema = z.array(z.object({
-	fileId: z.number().int().positive(),
-	title: z.string(),
-}));
+const recentSchema = z.array(
+	z.object({
+		fileId: z.number().int().positive(),
+		title: z.string(),
+	}),
+);
 
 function readStorage(): RecentNote[] {
 	if (typeof globalThis === 'undefined' || globalThis.localStorage === undefined) {
@@ -47,7 +49,7 @@ function writeStorage(entries: RecentNote[]) {
 
 export function pushRecentNote(note: RecentNote) {
 	const current = readStorage();
-	const filtered = current.filter(n => n.fileId !== note.fileId);
+	const filtered = current.filter((n) => n.fileId !== note.fileId);
 	const next = [note, ...filtered].slice(0, MAX_ENTRIES);
 	writeStorage(next);
 }
@@ -76,5 +78,5 @@ export function useRecentlyViewed() {
 		pushRecentNote(note);
 	}, []);
 
-	return {entries, isHydrated, push};
+	return { entries, isHydrated, push };
 }

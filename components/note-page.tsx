@@ -1,18 +1,16 @@
 'use client';
 
-import {
-	Fragment, useEffect, useRef, useState,
-} from 'react';
-import {useRouter} from 'next/navigation';
-import useSWR, {mutate} from 'swr';
-import {Bot, FilePlusCorner} from 'lucide-react';
-import {fileContentSchema} from './sidebar-context';
-import {LoaderIcon, PencilEditIcon, TrashIcon} from './icons';
-import {NoteComposer} from './note-composer';
-import {NotePopover} from './note-popover';
-import {NoteExpander} from './note-expander';
-import {pushRecentNote} from '@/hooks/use-recently-viewed';
-import {fetcher} from '@/utils/functions';
+import { Bot, FilePlusCorner } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import useSWR, { mutate } from 'swr';
+import { pushRecentNote } from '@/hooks/use-recently-viewed';
+import { fetcher } from '@/utils/functions';
+import { LoaderIcon, PencilEditIcon, TrashIcon } from './icons';
+import { NoteComposer } from './note-composer';
+import { NoteExpander } from './note-expander';
+import { NotePopover } from './note-popover';
+import { fileContentSchema } from './sidebar-context';
 
 type SourceFile = {
 	fileId: number;
@@ -48,7 +46,7 @@ type HighlightSpan = {
 
 export function computeHighlightSpans(
 	content: string,
-	highlights: Array<{quotedText: string; noteFileId: number}>,
+	highlights: Array<{ quotedText: string; noteFileId: number }>,
 ): HighlightSpan[] {
 	const lower = content.toLowerCase();
 	const all: HighlightSpan[] = [];
@@ -66,7 +64,7 @@ export function computeHighlightSpans(
 				break;
 			}
 
-			all.push({start: index, end: index + needle.length, noteFileId: h.noteFileId});
+			all.push({ start: index, end: index + needle.length, noteFileId: h.noteFileId });
 			from = index + needle.length;
 		}
 	}
@@ -93,7 +91,7 @@ export function HighlightedBody({
 	onHighlightClick,
 }: {
 	content: string;
-	highlights: Array<{quotedText: string; noteFileId: number}>;
+	highlights: Array<{ quotedText: string; noteFileId: number }>;
 	onHighlightClick: (noteFileId: number) => void;
 }) {
 	if (highlights.length === 0) {
@@ -113,28 +111,32 @@ export function HighlightedBody({
 			nodes.push(<Fragment key={`t-${i}`}>{content.slice(cursor, span.start)}</Fragment>);
 		}
 
-		nodes.push(<mark
-			key={`m-${i}`}
-			className='bg-yellow-200 dark:bg-yellow-600 cursor-pointer rounded-sm'
-			onClick={() => {
-				onHighlightClick(span.noteFileId);
-			}}
-		>
-			{content.slice(span.start, span.end)}
-		</mark>);
+		nodes.push(
+			// biome-ignore lint/a11y/useKeyWithClickEvents: highlight is activated via note link; mark stays semantic
+			// biome-ignore lint/a11y/noNoninteractiveElementInteractions: highlight is activated via note link; mark stays semantic
+			<mark
+				key={`m-${i}`}
+				className="cursor-pointer rounded-sm bg-yellow-200 dark:bg-yellow-600"
+				onClick={() => {
+					onHighlightClick(span.noteFileId);
+				}}
+			>
+				{content.slice(span.start, span.end)}
+			</mark>,
+		);
 		cursor = span.end;
 	}
 
 	if (cursor < content.length) {
-		nodes.push(<Fragment key='t-end'>{content.slice(cursor)}</Fragment>);
+		nodes.push(<Fragment key="t-end">{content.slice(cursor)}</Fragment>);
 	}
 
 	return <>{nodes}</>;
 }
 
-function ProvenanceInfo({fileId}: {fileId: number | null}) {
+function ProvenanceInfo({ fileId }: { fileId: number | null }) {
 	const router = useRouter();
-	const {data, isLoading} = useSWR<SourcesData>(
+	const { data, isLoading } = useSWR<SourcesData>(
 		fileId ? `/api/files/sources?id=${fileId}` : null,
 		fetcher,
 	);
@@ -144,8 +146,8 @@ function ProvenanceInfo({fileId}: {fileId: number | null}) {
 	}
 
 	const hasSources = data.sources.length > 0;
-	const notes = data.derived.filter(d => d.sourceType === 'manual');
-	const generated = data.derived.filter(d => d.sourceType === 'generated');
+	const notes = data.derived.filter((d) => d.sourceType === 'manual');
+	const generated = data.derived.filter((d) => d.sourceType === 'generated');
 
 	if (!hasSources && notes.length === 0 && generated.length === 0) {
 		return null;
@@ -156,19 +158,19 @@ function ProvenanceInfo({fileId}: {fileId: number | null}) {
 	};
 
 	return (
-		<div className='flex flex-col gap-2 text-xs text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700 pb-3'>
+		<div className="flex flex-col gap-2 border-zinc-200 border-b pb-3 text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
 			{hasSources && (
 				<div>
-					<div className='font-medium text-zinc-600 dark:text-zinc-300 mb-1'>Generated from:</div>
-					<ul className='space-y-0.5 pl-2 border-l border-zinc-300 dark:border-zinc-600'>
-						{data.sources.map(source => (
-							<li key={source.fileId} className='truncate'>
+					<div className="mb-1 font-medium text-zinc-600 dark:text-zinc-300">Generated from:</div>
+					<ul className="space-y-0.5 border-zinc-300 border-l pl-2 dark:border-zinc-600">
+						{data.sources.map((source) => (
+							<li key={source.fileId} className="truncate">
 								<button
-									type='button'
+									type="button"
 									onClick={() => {
 										navigate(source.fileId);
 									}}
-									className='text-left hover:underline'
+									className="text-left hover:underline"
 								>
 									{source.title ?? source.pathname}
 								</button>
@@ -179,16 +181,16 @@ function ProvenanceInfo({fileId}: {fileId: number | null}) {
 			)}
 			{generated.length > 0 && (
 				<div>
-					<div className='font-medium text-zinc-600 dark:text-zinc-300 mb-1'>Used to generate:</div>
-					<ul className='space-y-0.5 pl-2 border-l border-zinc-300 dark:border-zinc-600'>
-						{generated.map(d => (
-							<li key={d.fileId} className='truncate'>
+					<div className="mb-1 font-medium text-zinc-600 dark:text-zinc-300">Used to generate:</div>
+					<ul className="space-y-0.5 border-zinc-300 border-l pl-2 dark:border-zinc-600">
+						{generated.map((d) => (
+							<li key={d.fileId} className="truncate">
 								<button
-									type='button'
+									type="button"
 									onClick={() => {
 										navigate(d.fileId);
 									}}
-									className='text-left hover:underline'
+									className="text-left hover:underline"
 								>
 									{d.title ?? d.pathname}
 								</button>
@@ -199,16 +201,16 @@ function ProvenanceInfo({fileId}: {fileId: number | null}) {
 			)}
 			{notes.length > 0 && (
 				<div>
-					<div className='font-medium text-zinc-600 dark:text-zinc-300 mb-1'>Notes attached:</div>
-					<ul className='space-y-0.5 pl-2 border-l border-zinc-300 dark:border-zinc-600'>
-						{notes.map(d => (
-							<li key={d.fileId} className='truncate'>
+					<div className="mb-1 font-medium text-zinc-600 dark:text-zinc-300">Notes attached:</div>
+					<ul className="space-y-0.5 border-zinc-300 border-l pl-2 dark:border-zinc-600">
+						{notes.map((d) => (
+							<li key={d.fileId} className="truncate">
 								<button
-									type='button'
+									type="button"
 									onClick={() => {
 										navigate(d.fileId);
 									}}
-									className='text-left hover:underline'
+									className="text-left hover:underline"
 								>
 									{d.title ?? d.pathname}
 								</button>
@@ -227,7 +229,7 @@ type Selection = {
 	left: number;
 };
 
-type HighlightInput = {quotedText: string; noteFileId: number};
+type HighlightInput = { quotedText: string; noteFileId: number };
 
 function getHighlightsInput(sourcesData: SourcesData | undefined): HighlightInput[] {
 	const result: HighlightInput[] = [];
@@ -242,7 +244,7 @@ function getHighlightsInput(sourcesData: SourcesData | undefined): HighlightInpu
 
 		for (const h of d.highlights) {
 			if (h.quotedText && h.quotedText.length > 0) {
-				result.push({quotedText: h.quotedText, noteFileId: d.fileId});
+				result.push({ quotedText: h.quotedText, noteFileId: d.fileId });
 			}
 		}
 	}
@@ -264,30 +266,26 @@ type NoteHeaderActionsProps = {
 	onDelete: () => void;
 };
 
-function EditingActions({isSaving, onCancelEdit, onSaveEdit}: Pick<NoteHeaderActionsProps, 'isSaving' | 'onCancelEdit' | 'onSaveEdit'>) {
+function EditingActions({
+	isSaving,
+	onCancelEdit,
+	onSaveEdit,
+}: Pick<NoteHeaderActionsProps, 'isSaving' | 'onCancelEdit' | 'onSaveEdit'>) {
 	return (
 		<>
 			<button
-				type='button'
+				type="button"
 				onClick={onCancelEdit}
 				disabled={isSaving}
-				className={
-					'text-sm px-3 py-1 rounded-md transition-colors '
-					+ 'bg-zinc-200 hover:bg-zinc-300 text-zinc-800 '
-					+ 'dark:bg-zinc-700 dark:hover:bg-zinc-600 dark:text-zinc-200 '
-					+ 'disabled:opacity-60 disabled:cursor-not-allowed'
-				}
+				className="rounded-md bg-zinc-200 px-3 py-1 text-sm text-zinc-800 transition-colors hover:bg-zinc-300 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600"
 			>
 				Cancel
 			</button>
 			<button
-				type='button'
+				type="button"
 				onClick={onSaveEdit}
 				disabled={isSaving}
-				className={
-					'text-sm px-3 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-50 '
-					+ 'transition-colors disabled:opacity-60 disabled:cursor-not-allowed'
-				}
+				className="rounded-md bg-zinc-800 px-3 py-1 text-sm text-zinc-50 transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
 			>
 				{isSaving ? 'Saving…' : 'Save'}
 			</button>
@@ -295,30 +293,37 @@ function EditingActions({isSaving, onCancelEdit, onSaveEdit}: Pick<NoteHeaderAct
 	);
 }
 
-const iconButtonClass = 'p-1.5 rounded-md cursor-pointer transition-colors '
-	+ 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 '
-	+ 'dark:hover:text-zinc-200 dark:hover:bg-zinc-700';
+const iconButtonClass =
+	'p-1.5 rounded-md cursor-pointer transition-colors ' +
+	'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 ' +
+	'dark:hover:text-zinc-200 dark:hover:bg-zinc-700';
 
 function ViewingActions({
-	isDeleting, canExpand, canEdit, onNewNote, onExpand, onStartEdit, onDelete,
+	isDeleting,
+	canExpand,
+	canEdit,
+	onNewNote,
+	onExpand,
+	onStartEdit,
+	onDelete,
 }: Omit<NoteHeaderActionsProps, 'isEditing' | 'isSaving' | 'onCancelEdit' | 'onSaveEdit'>) {
 	return (
 		<>
 			<button
-				type='button'
+				type="button"
 				onClick={onNewNote}
-				title='New note'
-				aria-label='New note'
+				title="New note"
+				aria-label="New note"
 				className={iconButtonClass}
 			>
 				<FilePlusCorner size={16} />
 			</button>
 			{canExpand && (
 				<button
-					type='button'
+					type="button"
 					onClick={onExpand}
-					title='Expand with AI'
-					aria-label='Expand with AI'
+					title="Expand with AI"
+					aria-label="Expand with AI"
 					className={iconButtonClass}
 				>
 					<Bot size={16} />
@@ -326,53 +331,53 @@ function ViewingActions({
 			)}
 			{canEdit && (
 				<button
-					type='button'
+					type="button"
 					onClick={onStartEdit}
-					title='Edit this note'
-					aria-label='Edit this note'
+					title="Edit this note"
+					aria-label="Edit this note"
 					className={iconButtonClass}
 				>
 					<PencilEditIcon />
 				</button>
 			)}
 			<button
-				type='button'
+				type="button"
 				onClick={onDelete}
 				disabled={isDeleting}
-				title='Delete this file'
-				aria-label='Delete this file'
-				className={
-					'p-1.5 rounded-md cursor-pointer transition-colors '
-					+ 'text-zinc-500 hover:text-red-500 hover:bg-red-100 dark:hover:bg-zinc-700 '
-					+ 'disabled:opacity-60 disabled:cursor-not-allowed'
-				}
+				title="Delete this file"
+				aria-label="Delete this file"
+				className="cursor-pointer rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-red-100 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-zinc-700"
 			>
-				{isDeleting
-					? (
-						<div className='animate-spin'>
-							<LoaderIcon />
-						</div>
-					)
-					: <TrashIcon />}
+				{isDeleting ? (
+					<div className="animate-spin">
+						<LoaderIcon />
+					</div>
+				) : (
+					<TrashIcon />
+				)}
 			</button>
 		</>
 	);
 }
 
 function NoteHeaderActions(props: NoteHeaderActionsProps) {
-	return props.isEditing
-		? <EditingActions isSaving={props.isSaving} onCancelEdit={props.onCancelEdit} onSaveEdit={props.onSaveEdit} />
-		: (
-			<ViewingActions
-				isDeleting={props.isDeleting}
-				canExpand={props.canExpand}
-				canEdit={props.canEdit}
-				onNewNote={props.onNewNote}
-				onExpand={props.onExpand}
-				onStartEdit={props.onStartEdit}
-				onDelete={props.onDelete}
-			/>
-		);
+	return props.isEditing ? (
+		<EditingActions
+			isSaving={props.isSaving}
+			onCancelEdit={props.onCancelEdit}
+			onSaveEdit={props.onSaveEdit}
+		/>
+	) : (
+		<ViewingActions
+			isDeleting={props.isDeleting}
+			canExpand={props.canExpand}
+			canEdit={props.canEdit}
+			onNewNote={props.onNewNote}
+			onExpand={props.onExpand}
+			onStartEdit={props.onStartEdit}
+			onDelete={props.onDelete}
+		/>
+	);
 }
 
 type NoteContent = {
@@ -381,7 +386,10 @@ type NoteContent = {
 };
 
 function NoteEditView({
-	editedContent, setEditedContent, isSaving, saveError,
+	editedContent,
+	setEditedContent,
+	isSaving,
+	saveError,
 }: {
 	editedContent: string;
 	setEditedContent: (value: string) => void;
@@ -392,21 +400,14 @@ function NoteEditView({
 		<>
 			<textarea
 				value={editedContent}
-				onChange={event => {
+				onChange={(event) => {
 					setEditedContent(event.target.value);
 				}}
 				disabled={isSaving}
-				className={
-					'w-full min-h-[60vh] p-3 text-sm font-mono rounded-md resize-y '
-					+ 'text-zinc-800 bg-zinc-50 border border-zinc-200 '
-					+ 'dark:text-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 '
-					+ 'focus:outline-none focus:ring-2 focus:ring-zinc-400 disabled:opacity-60'
-				}
+				className="min-h-[60vh] w-full resize-y rounded-md border border-zinc-200 bg-zinc-50 p-3 font-mono text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-400 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
 			/>
-			{saveError && (
-				<div className='text-xs text-red-500'>{saveError}</div>
-			)}
-			<div className='text-xs text-zinc-400 dark:text-zinc-500 italic'>
+			{saveError && <div className="text-red-500 text-xs">{saveError}</div>}
+			<div className="text-xs text-zinc-400 italic dark:text-zinc-500">
 				Markdown is preserved as-is.
 			</div>
 		</>
@@ -414,7 +415,10 @@ function NoteEditView({
 }
 
 function NoteReadView({
-	bodyRef, note, highlightsInput, onHighlightClick,
+	bodyRef,
+	note,
+	highlightsInput,
+	onHighlightClick,
 }: {
 	bodyRef: React.RefObject<HTMLDivElement>;
 	note: NoteContent | null;
@@ -423,7 +427,7 @@ function NoteReadView({
 }) {
 	return (
 		<>
-			<div ref={bodyRef} className='text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap'>
+			<div ref={bodyRef} className="whitespace-pre-wrap text-zinc-800 dark:text-zinc-300">
 				{note?.content !== undefined && (
 					<HighlightedBody
 						content={note.content}
@@ -433,7 +437,7 @@ function NoteReadView({
 				)}
 			</div>
 			{note?.truncated && (
-				<div className='text-xs text-zinc-400 dark:text-zinc-500 italic'>
+				<div className="text-xs text-zinc-400 italic dark:text-zinc-500">
 					Content truncated to ~5,000 words.
 				</div>
 			)}
@@ -441,10 +445,10 @@ function NoteReadView({
 	);
 }
 
-export function NotePage({fileId}: {fileId: number}) {
+export function NotePage({ fileId }: { fileId: number }) {
 	const router = useRouter();
 	const bodyRef = useRef<HTMLDivElement>(null);
-	const [composerState, setComposerState] = useState<{quotedText?: string} | null>(null);
+	const [composerState, setComposerState] = useState<{ quotedText?: string } | null>(null);
 	const [selection, setSelection] = useState<Selection | null>(null);
 	const [popoverNoteId, setPopoverNoteId] = useState<number | null>(null);
 	const [isExpanderOpen, setIsExpanderOpen] = useState(false);
@@ -461,7 +465,7 @@ export function NotePage({fileId}: {fileId: number}) {
 		}
 
 		setIsDeleting(true);
-		const response = await fetch(`/api/files/delete?id=${fileId}`, {method: 'DELETE'});
+		const response = await fetch(`/api/files/delete?id=${fileId}`, { method: 'DELETE' });
 		if (response.ok) {
 			await mutate('/api/files/list');
 			router.push('/');
@@ -471,23 +475,20 @@ export function NotePage({fileId}: {fileId: number}) {
 		setIsDeleting(false);
 	};
 
-	const {data: noteData, isLoading: isLoadingContent} = useSWR(
+	const { data: noteData, isLoading: isLoadingContent } = useSWR(
 		`/api/files/content?id=${fileId}`,
 		fetcher,
 	);
 	const parsedContent = noteData ? fileContentSchema.safeParse(noteData) : null;
 	const note = parsedContent?.success ? parsedContent.data : null;
 
-	const {data: sourcesData} = useSWR<SourcesData>(
-		`/api/files/sources?id=${fileId}`,
-		fetcher,
-	);
+	const { data: sourcesData } = useSWR<SourcesData>(`/api/files/sources?id=${fileId}`, fetcher);
 
 	const label = note?.title ?? note?.pathname;
 
 	useEffect(() => {
 		if (label) {
-			pushRecentNote({fileId, title: label});
+			pushRecentNote({ fileId, title: label });
 		}
 	}, [fileId, label]);
 
@@ -521,7 +522,7 @@ export function NotePage({fileId}: {fileId: number}) {
 			setSelection({
 				text,
 				top: rect.top + globalThis.scrollY - 36,
-				left: rect.left + (rect.width / 2),
+				left: rect.left + rect.width / 2,
 			});
 		};
 
@@ -560,8 +561,8 @@ export function NotePage({fileId}: {fileId: number}) {
 		setSaveError(null);
 		const response = await fetch(`/api/files/content?id=${fileId}`, {
 			method: 'PATCH',
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({content: editedContent}),
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ content: editedContent }),
 		});
 		setIsSaving(false);
 		if (!response.ok) {
@@ -576,13 +577,13 @@ export function NotePage({fileId}: {fileId: number}) {
 	const highlightsInput = getHighlightsInput(sourcesData);
 
 	return (
-		<div className='flex flex-row justify-center pb-20 h-full bg-white dark:bg-zinc-900'>
-			<div className='flex flex-col w-full items-center overflow-y-auto'>
-				<div className='flex items-center justify-between w-full md:w-[500px] px-4 md:px-0 pt-8 pb-4 border-b border-gray-800'>
-					<h2 className='text-lg font-semibold text-zinc-800 dark:text-zinc-200 truncate'>
+		<div className="flex h-full flex-row justify-center bg-white pb-20 dark:bg-zinc-900">
+			<div className="flex w-full flex-col items-center overflow-y-auto">
+				<div className="flex w-full items-center justify-between border-gray-800 border-b px-4 pt-8 pb-4 md:w-[500px] md:px-0">
+					<h2 className="truncate font-semibold text-lg text-zinc-800 dark:text-zinc-200">
 						{label ?? 'Loading...'}
 					</h2>
-					<div className='flex flex-row gap-2 flex-shrink-0 ml-4 items-center'>
+					<div className="ml-4 flex flex-shrink-0 flex-row items-center gap-2">
 						<NoteHeaderActions
 							isEditing={isEditing}
 							isSaving={isSaving}
@@ -607,43 +608,39 @@ export function NotePage({fileId}: {fileId: number}) {
 					</div>
 				</div>
 
-				{isLoadingContent
-					? (
-						<div className='flex items-center justify-center flex-1 text-zinc-400'>
-							<div className='animate-spin'>
-								<LoaderIcon />
-							</div>
+				{isLoadingContent ? (
+					<div className="flex flex-1 items-center justify-center text-zinc-400">
+						<div className="animate-spin">
+							<LoaderIcon />
 						</div>
-					)
-					: (
-						<div className='flex flex-col gap-4 w-full md:w-[500px] px-4 md:px-0 py-4'>
-							<ProvenanceInfo fileId={fileId} />
-							{isEditing
-								? (
-									<NoteEditView
-										editedContent={editedContent}
-										setEditedContent={setEditedContent}
-										isSaving={isSaving}
-										saveError={saveError}
-									/>
-								)
-								: (
-									<NoteReadView
-										bodyRef={bodyRef}
-										note={note}
-										highlightsInput={highlightsInput}
-										onHighlightClick={setPopoverNoteId}
-									/>
-								)}
-						</div>
-					)}
+					</div>
+				) : (
+					<div className="flex w-full flex-col gap-4 px-4 py-4 md:w-[500px] md:px-0">
+						<ProvenanceInfo fileId={fileId} />
+						{isEditing ? (
+							<NoteEditView
+								editedContent={editedContent}
+								setEditedContent={setEditedContent}
+								isSaving={isSaving}
+								saveError={saveError}
+							/>
+						) : (
+							<NoteReadView
+								bodyRef={bodyRef}
+								note={note}
+								highlightsInput={highlightsInput}
+								onHighlightClick={setPopoverNoteId}
+							/>
+						)}
+					</div>
+				)}
 			</div>
 
 			{selection && (
 				<button
-					type='button'
+					type="button"
 					onClick={() => {
-						setComposerState({quotedText: selection.text});
+						setComposerState({ quotedText: selection.text });
 						globalThis.getSelection()?.removeAllRanges();
 					}}
 					style={{
@@ -652,7 +649,7 @@ export function NotePage({fileId}: {fileId: number}) {
 						left: selection.left,
 						transform: 'translateX(-50%)',
 					}}
-					className='z-20 text-xs px-2 py-1 rounded-md bg-zinc-800 text-zinc-50 shadow-lg hover:bg-zinc-700 transition-colors'
+					className="z-20 rounded-md bg-zinc-800 px-2 py-1 text-xs text-zinc-50 shadow-lg transition-colors hover:bg-zinc-700"
 				>
 					Note this
 				</button>

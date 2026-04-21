@@ -1,8 +1,8 @@
-import {spawnSync} from 'node:child_process';
-import {config} from 'dotenv';
+import { spawnSync } from 'node:child_process';
+import { config } from 'dotenv';
 import postgres from 'postgres';
 
-config({path: '.env.local'});
+config({ path: '.env.local' });
 
 const confirmed = process.argv.includes('--yes');
 

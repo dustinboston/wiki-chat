@@ -1,10 +1,16 @@
-import {
-	describe, it, expect, vi, beforeEach,
-} from 'vitest';
-import {type Session} from 'next-auth';
-import {POST as postChat} from '@/app/(chat)/api/chat/route';
+import type { Session } from 'next-auth';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { POST as postChat } from '@/app/(chat)/api/chat/route';
 
-const {mockAuth, mockStreamText, mockSaveMessage, mockRetrieveAndAugment, mockCreateDataStreamResponse, mockListFiles, mockGetFile} = vi.hoisted(() => ({
+const {
+	mockAuth,
+	mockStreamText,
+	mockSaveMessage,
+	mockRetrieveAndAugment,
+	mockCreateDataStreamResponse,
+	mockListFiles,
+	mockGetFile,
+} = vi.hoisted(() => ({
 	mockAuth: vi.fn(),
 	mockStreamText: vi.fn(),
 	mockSaveMessage: vi.fn(),
@@ -42,22 +48,24 @@ vi.mock('ai', () => ({
 }));
 
 function mockSession(email: string): Session {
-	return {user: {email}, expires: '2099-01-01'};
+	return { user: { email }, expires: '2099-01-01' };
 }
 
 describe('POST /api/chat', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockRetrieveAndAugment.mockResolvedValue({messages: [], sources: []});
+		mockRetrieveAndAugment.mockResolvedValue({ messages: [], sources: [] });
 		mockListFiles.mockResolvedValue([]);
-		mockCreateDataStreamResponse.mockImplementation(({execute}: {execute: (ds: Record<string, unknown>) => void}) => {
-			const mockDataStream = {
-				writeMessageAnnotation: vi.fn(),
-			};
+		mockCreateDataStreamResponse.mockImplementation(
+			({ execute }: { execute: (ds: Record<string, unknown>) => void }) => {
+				const mockDataStream = {
+					writeMessageAnnotation: vi.fn(),
+				};
 
-			execute(mockDataStream);
-			return new Response('stream');
-		});
+				execute(mockDataStream);
+				return new Response('stream');
+			},
+		);
 	});
 
 	it('returns 401 when not authenticated', async () => {
@@ -65,10 +73,10 @@ describe('POST /api/chat', () => {
 
 		const request = new Request('http://localhost/api/chat', {
 			method: 'POST',
-			headers: {'Content-Type': 'application/json'},
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				id: '1',
-				messages: [{role: 'user', content: 'hi'}],
+				messages: [{ role: 'user', content: 'hi' }],
 				selectedFileIds: [],
 			}),
 		});
@@ -81,7 +89,7 @@ describe('POST /api/chat', () => {
 	it('calls retrieveAndAugment and streamText when authenticated', async () => {
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
 
-		const augmentedMessages = [{role: 'user', content: 'augmented'}];
+		const augmentedMessages = [{ role: 'user', content: 'augmented' }];
 		mockRetrieveAndAugment.mockResolvedValue({
 			messages: augmentedMessages,
 			sources: [],
@@ -90,10 +98,10 @@ describe('POST /api/chat', () => {
 			mergeIntoDataStream: vi.fn(),
 		});
 
-		const messages = [{role: 'user', content: 'hello'}];
+		const messages = [{ role: 'user', content: 'hello' }];
 		const request = new Request('http://localhost/api/chat', {
 			method: 'POST',
-			headers: {'Content-Type': 'application/json'},
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				id: 'chat-1',
 				messages,
@@ -107,45 +115,49 @@ describe('POST /api/chat', () => {
 			messages,
 			fileIds: [1, 2],
 		});
-		expect(mockStreamText).toHaveBeenCalledWith(expect.objectContaining({
-			temperature: 0,
-			messages: augmentedMessages,
-		}));
+		expect(mockStreamText).toHaveBeenCalledWith(
+			expect.objectContaining({
+				temperature: 0,
+				messages: augmentedMessages,
+			}),
+		);
 	});
 
 	it('falls back to all user files when selectedFileIds is empty', async () => {
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
-		mockListFiles.mockResolvedValue([{id: 7}, {id: 9}]);
-		mockStreamText.mockReturnValue({mergeIntoDataStream: vi.fn()});
+		mockListFiles.mockResolvedValue([{ id: 7 }, { id: 9 }]);
+		mockStreamText.mockReturnValue({ mergeIntoDataStream: vi.fn() });
 
 		const request = new Request('http://localhost/api/chat', {
 			method: 'POST',
-			headers: {'Content-Type': 'application/json'},
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				id: 'chat-1',
-				messages: [{role: 'user', content: 'hi'}],
+				messages: [{ role: 'user', content: 'hi' }],
 				selectedFileIds: [],
 			}),
 		});
 
 		await postChat(request);
 
-		expect(mockListFiles).toHaveBeenCalledWith({email: 'a@b.com'});
-		expect(mockRetrieveAndAugment).toHaveBeenCalledWith(expect.objectContaining({
-			fileIds: [7, 9],
-		}));
+		expect(mockListFiles).toHaveBeenCalledWith({ email: 'a@b.com' });
+		expect(mockRetrieveAndAugment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				fileIds: [7, 9],
+			}),
+		);
 	});
 
 	it('does not call listFiles when selectedFileIds is non-empty', async () => {
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
-		mockStreamText.mockReturnValue({mergeIntoDataStream: vi.fn()});
+		mockStreamText.mockReturnValue({ mergeIntoDataStream: vi.fn() });
 
 		const request = new Request('http://localhost/api/chat', {
 			method: 'POST',
-			headers: {'Content-Type': 'application/json'},
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				id: 'chat-1',
-				messages: [{role: 'user', content: 'hi'}],
+				messages: [{ role: 'user', content: 'hi' }],
 				selectedFileIds: [3],
 			}),
 		});
@@ -153,51 +165,58 @@ describe('POST /api/chat', () => {
 		await postChat(request);
 
 		expect(mockListFiles).not.toHaveBeenCalled();
-		expect(mockRetrieveAndAugment).toHaveBeenCalledWith(expect.objectContaining({
-			fileIds: [3],
-		}));
+		expect(mockRetrieveAndAugment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				fileIds: [3],
+			}),
+		);
 	});
 
 	it('onFinish callback saves the message with source annotations', async () => {
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
 
-		const sources = [{chunkId: 'c1', fileId: 1, similarity: 0.9}];
+		const sources = [{ chunkId: 'c1', fileId: 1, similarity: 0.9 }];
 		mockRetrieveAndAugment.mockResolvedValue({
-			messages: [{role: 'user', content: 'hello'}],
+			messages: [{ role: 'user', content: 'hello' }],
 			sources,
 		});
 
-		let capturedOnFinish: ((arguments_: {text: string}) => Promise<void>) | undefined;
-		mockStreamText.mockImplementation((options: {onFinish?: (arguments_: {text: string}) => Promise<void>}) => {
-			if (options.onFinish) {
-				capturedOnFinish = options.onFinish;
-			}
+		let capturedOnFinish: ((arguments_: { text: string }) => Promise<void>) | undefined;
+		mockStreamText.mockImplementation(
+			(options: { onFinish?: (arguments_: { text: string }) => Promise<void> }) => {
+				if (options.onFinish) {
+					capturedOnFinish = options.onFinish;
+				}
 
-			return {mergeIntoDataStream: vi.fn()};
-		});
+				return { mergeIntoDataStream: vi.fn() };
+			},
+		);
 
-		const messages = [{role: 'user', content: 'hello'}];
+		const messages = [{ role: 'user', content: 'hello' }];
 		const request = new Request('http://localhost/api/chat', {
 			method: 'POST',
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({id: 'chat-1', messages, selectedFileIds: []}),
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ id: 'chat-1', messages, selectedFileIds: [] }),
 		});
 
 		await postChat(request);
 
 		expect(capturedOnFinish).toBeDefined();
 		if (capturedOnFinish) {
-			await capturedOnFinish({text: 'AI response'});
+			await capturedOnFinish({ text: 'AI response' });
 		}
 
 		expect(mockSaveMessage).toHaveBeenCalledWith({
 			id: 'chat-1',
-			messages: [...messages, {
-				id: 'chat-1',
-				role: 'assistant',
-				content: 'AI response',
-				annotations: [{sources}],
-			}],
+			messages: [
+				...messages,
+				{
+					id: 'chat-1',
+					role: 'assistant',
+					content: 'AI response',
+					annotations: [{ sources }],
+				},
+			],
 			author: 'a@b.com',
 		});
 	});
@@ -205,16 +224,20 @@ describe('POST /api/chat', () => {
 	describe('with noteContext', () => {
 		it('rejects when the note is not owned by the user', async () => {
 			mockAuth.mockResolvedValue(mockSession('a@b.com'));
-			mockGetFile.mockResolvedValue({id: 42, userEmail: 'someone-else@b.com', sourceType: 'manual'});
+			mockGetFile.mockResolvedValue({
+				id: 42,
+				userEmail: 'someone-else@b.com',
+				sourceType: 'manual',
+			});
 
 			const request = new Request('http://localhost/api/chat', {
 				method: 'POST',
-				headers: {'Content-Type': 'application/json'},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					id: 'chat-1',
-					messages: [{role: 'user', content: 'expand'}],
+					messages: [{ role: 'user', content: 'expand' }],
 					selectedFileIds: [],
-					noteContext: {fileId: 42, title: 'My Note', content: 'tiny note'},
+					noteContext: { fileId: 42, title: 'My Note', content: 'tiny note' },
 				}),
 			});
 
@@ -225,16 +248,16 @@ describe('POST /api/chat', () => {
 
 		it('rejects when the file sourceType is upload', async () => {
 			mockAuth.mockResolvedValue(mockSession('a@b.com'));
-			mockGetFile.mockResolvedValue({id: 42, userEmail: 'a@b.com', sourceType: 'upload'});
+			mockGetFile.mockResolvedValue({ id: 42, userEmail: 'a@b.com', sourceType: 'upload' });
 
 			const request = new Request('http://localhost/api/chat', {
 				method: 'POST',
-				headers: {'Content-Type': 'application/json'},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					id: 'chat-1',
-					messages: [{role: 'user', content: 'expand'}],
+					messages: [{ role: 'user', content: 'expand' }],
 					selectedFileIds: [],
-					noteContext: {fileId: 42, title: 'PDF', content: 'some content'},
+					noteContext: { fileId: 42, title: 'PDF', content: 'some content' },
 				}),
 			});
 
@@ -244,29 +267,31 @@ describe('POST /api/chat', () => {
 
 		it('skips RAG, injects note context as system message, and skips persistence on finish', async () => {
 			mockAuth.mockResolvedValue(mockSession('a@b.com'));
-			mockGetFile.mockResolvedValue({id: 42, userEmail: 'a@b.com', sourceType: 'manual'});
+			mockGetFile.mockResolvedValue({ id: 42, userEmail: 'a@b.com', sourceType: 'manual' });
 
-			type CapturedMessage = {role: string; content: string};
-			let capturedOnFinish: ((arguments_: {text: string}) => Promise<void>) | undefined;
+			type CapturedMessage = { role: string; content: string };
+			let capturedOnFinish: ((arguments_: { text: string }) => Promise<void>) | undefined;
 			let capturedMessages: CapturedMessage[] | undefined;
-			mockStreamText.mockImplementation((options: {
-				onFinish?: (arguments_: {text: string}) => Promise<void>;
-				messages: CapturedMessage[];
-			}) => {
-				capturedOnFinish = options.onFinish;
-				capturedMessages = options.messages;
-				return {mergeIntoDataStream: vi.fn()};
-			});
+			mockStreamText.mockImplementation(
+				(options: {
+					onFinish?: (arguments_: { text: string }) => Promise<void>;
+					messages: CapturedMessage[];
+				}) => {
+					capturedOnFinish = options.onFinish;
+					capturedMessages = options.messages;
+					return { mergeIntoDataStream: vi.fn() };
+				},
+			);
 
-			const messages = [{role: 'user', content: 'expand this'}];
+			const messages = [{ role: 'user', content: 'expand this' }];
 			const request = new Request('http://localhost/api/chat', {
 				method: 'POST',
-				headers: {'Content-Type': 'application/json'},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					id: 'chat-1',
 					messages,
 					selectedFileIds: [],
-					noteContext: {fileId: 42, title: 'Tim Berners-Lee', content: 'Invented the web.'},
+					noteContext: { fileId: 42, title: 'Tim Berners-Lee', content: 'Invented the web.' },
 				}),
 			});
 
@@ -280,7 +305,7 @@ describe('POST /api/chat', () => {
 			expect(first?.content).toContain('Invented the web.');
 
 			if (capturedOnFinish) {
-				await capturedOnFinish({text: 'Expanded article about TBL.'});
+				await capturedOnFinish({ text: 'Expanded article about TBL.' });
 			}
 
 			expect(mockSaveMessage).not.toHaveBeenCalled();

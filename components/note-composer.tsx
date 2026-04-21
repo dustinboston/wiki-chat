@@ -1,9 +1,7 @@
 'use client';
 
-import {
-	useCallback, useEffect, useMemo, useRef, useState,
-} from 'react';
-import {useSidebar} from './sidebar-context';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSidebar } from './sidebar-context';
 
 type NoteComposerProps = {
 	parentFileId?: number;
@@ -12,10 +10,15 @@ type NoteComposerProps = {
 	onClose: () => void;
 };
 
-export function NoteComposer({parentFileId, parentLabel, quotedText, onClose}: NoteComposerProps) {
-	const {uploadFile} = useSidebar();
+export function NoteComposer({
+	parentFileId,
+	parentLabel,
+	quotedText,
+	onClose,
+}: NoteComposerProps) {
+	const { uploadFile } = useSidebar();
 	const parent = useMemo(
-		() => (parentFileId === undefined ? undefined : {id: parentFileId, label: parentLabel}),
+		() => (parentFileId === undefined ? undefined : { id: parentFileId, label: parentLabel }),
 		[parentFileId, parentLabel],
 	);
 	const quoted = useMemo(() => quotedText, [quotedText]);
@@ -78,81 +81,69 @@ export function NoteComposer({parentFileId, parentLabel, quotedText, onClose}: N
 	}, [canSave, title, defaultTitle, body, uploadFile, parent, quoted, onClose]);
 
 	return (
-		<div
-			className='fixed inset-0 z-[60] flex items-center justify-center bg-zinc-900/50 px-4'
-			onClick={onClose}
-		>
+		<div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+			<button
+				type="button"
+				aria-label="Close dialog"
+				className="absolute inset-0 bg-zinc-900/50"
+				onClick={onClose}
+			/>
 			<div
-				className='w-full max-w-lg rounded-lg bg-white dark:bg-zinc-800 shadow-xl border border-zinc-200 dark:border-zinc-700 flex flex-col'
-				onClick={event => {
-					event.stopPropagation();
-				}}
+				role="dialog"
+				aria-modal="true"
+				className="relative flex w-full max-w-lg flex-col rounded-lg border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-800"
 			>
-				<div className='flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-700'>
-					<h2 className='text-sm font-semibold text-zinc-800 dark:text-zinc-100'>
+				<div className="flex items-center justify-between border-zinc-200 border-b px-4 py-3 dark:border-zinc-700">
+					<h2 className="font-semibold text-sm text-zinc-800 dark:text-zinc-100">
 						{parent ? `Note on ${parent.label ?? 'article'}` : 'New note'}
 					</h2>
 					<button
-						type='button'
+						type="button"
 						onClick={onClose}
-						className='text-xs px-2 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-zinc-600 dark:text-zinc-300 transition-colors'
+						className="rounded-md bg-zinc-100 px-2 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"
 					>
 						Close
 					</button>
 				</div>
 
-				<div className='flex flex-col gap-3 px-4 py-3'>
+				<div className="flex flex-col gap-3 px-4 py-3">
 					<input
-						type='text'
+						type="text"
 						value={title}
-						onChange={event => {
+						onChange={(event) => {
 							setTitle(event.target.value);
 						}}
 						placeholder={defaultTitle}
-						className={
-							'w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 '
-							+ 'rounded-md px-2 py-1 text-sm outline-none text-zinc-800 dark:text-zinc-200 '
-							+ 'placeholder:text-zinc-400'
-						}
+						className="w-full rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-sm text-zinc-800 outline-none placeholder:text-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
 					/>
 					<textarea
 						ref={textareaRef}
 						value={body}
-						onChange={event => {
+						onChange={(event) => {
 							setBody(event.target.value);
 						}}
-						placeholder='Write your note…'
+						placeholder="Write your note…"
 						rows={10}
-						className={
-							'w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 '
-							+ 'rounded-md px-2 py-2 text-sm outline-none text-zinc-800 dark:text-zinc-200 '
-							+ 'placeholder:text-zinc-400 resize-none font-mono'
-						}
+						className="w-full resize-none rounded-md border border-zinc-200 bg-zinc-50 px-2 py-2 font-mono text-sm text-zinc-800 outline-none placeholder:text-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
 					/>
-					{errorMessage && (
-						<div className='text-xs text-red-500'>{errorMessage}</div>
-					)}
+					{errorMessage && <div className="text-red-500 text-xs">{errorMessage}</div>}
 				</div>
 
-				<div className='flex justify-end gap-2 px-4 py-3 border-t border-zinc-200 dark:border-zinc-700'>
+				<div className="flex justify-end gap-2 border-zinc-200 border-t px-4 py-3 dark:border-zinc-700">
 					<button
-						type='button'
+						type="button"
 						onClick={onClose}
-						className='text-xs px-3 py-1.5 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-zinc-600 dark:text-zinc-300 transition-colors'
+						className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"
 					>
 						Cancel
 					</button>
 					<button
-						type='button'
+						type="button"
 						onClick={() => {
 							void handleSave();
 						}}
 						disabled={!canSave}
-						className={
-							'text-xs px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-50 '
-							+ 'transition-colors disabled:opacity-60 disabled:cursor-not-allowed '
-							+ 'disabled:hover:bg-zinc-800'
-						}
+						className="rounded-md bg-zinc-800 px-3 py-1.5 text-xs text-zinc-50 transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-zinc-800"
 					>
 						{status === 'saving' ? 'Saving…' : 'Save'}
 					</button>

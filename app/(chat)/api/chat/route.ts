@@ -1,37 +1,36 @@
+import { openai } from '@ai-sdk/openai';
 import {
 	type CoreMessage,
-	type Message,
 	convertToCoreMessages,
 	createDataStreamResponse,
+	type Message,
 	streamText,
 } from 'ai';
-import {z} from 'zod';
-import {openai} from '@ai-sdk/openai';
-import {auth} from '@/app/(auth)/auth';
-import {saveMessage} from '@/services/chat';
-import {listFiles, getFile} from '@/services/file';
-import {retrieveAndAugment} from '@/ai/rag';
+import { z } from 'zod';
+import { retrieveAndAugment } from '@/ai/rag';
+import { auth } from '@/app/(auth)/auth';
+import { saveMessage } from '@/services/chat';
+import { getFile, listFiles } from '@/services/file';
 
 function isMessage(item: unknown): item is Message {
-	return typeof item === 'object'
-		&& item !== null
-		&& 'role' in item
-		&& 'content' in item;
+	return typeof item === 'object' && item !== null && 'role' in item && 'content' in item;
 }
 
 function isMessageArray(value: unknown): value is Message[] {
-	return Array.isArray(value) && value.every(item => isMessage(item));
+	return Array.isArray(value) && value.every((item) => isMessage(item));
 }
 
 const chatRequestSchema = z.object({
 	id: z.string(),
 	messages: z.custom<Message[]>(isMessageArray),
 	selectedFileIds: z.array(z.number()),
-	noteContext: z.object({
-		fileId: z.number().int().positive(),
-		title: z.string(),
-		content: z.string(),
-	}).optional(),
+	noteContext: z
+		.object({
+			fileId: z.number().int().positive(),
+			title: z.string(),
+			content: z.string(),
+		})
+		.optional(),
 });
 
 const system = `
@@ -62,12 +61,12 @@ IMPORTANT: Always format your response as follows:
  */
 export async function POST(request: Request) {
 	const json: unknown = await request.json();
-	const {id, messages, selectedFileIds, noteContext} = chatRequestSchema.parse(json);
+	const { id, messages, selectedFileIds, noteContext } = chatRequestSchema.parse(json);
 
 	const session = await auth();
 
 	if (!session?.user?.email) {
-		return new Response('Unauthorized', {status: 401});
+		return new Response('Unauthorized', { status: 401 });
 	}
 
 	const userEmail = session.user.email;
@@ -76,29 +75,32 @@ export async function POST(request: Request) {
 	let sources: Awaited<ReturnType<typeof retrieveAndAugment>>['sources'] = [];
 
 	if (noteContext) {
-		const noteFile = await getFile({id: noteContext.fileId});
+		const noteFile = await getFile({ id: noteContext.fileId });
 		if (noteFile?.userEmail !== userEmail) {
-			return new Response('Forbidden', {status: 403});
+			return new Response('Forbidden', { status: 403 });
 		}
 
 		if (noteFile.sourceType !== 'manual' && noteFile.sourceType !== 'generated') {
-			return new Response('Note context is only allowed for notes and generated files', {status: 403});
+			return new Response('Note context is only allowed for notes and generated files', {
+				status: 403,
+			});
 		}
 
 		const contextPrefix: CoreMessage = {
 			role: 'system',
-			content: `The user is working on the note titled "${noteContext.title}". `
-				+ `Its current contents are:\n\n${noteContext.content}\n\n`
-				+ 'When asked to expand, rewrite, or generate, produce a new complete '
-				+ 'note body that could replace the current contents.',
+			content:
+				`The user is working on the note titled "${noteContext.title}". ` +
+				`Its current contents are:\n\n${noteContext.content}\n\n` +
+				'When asked to expand, rewrite, or generate, produce a new complete ' +
+				'note body that could replace the current contents.',
 		};
 		augmentedMessages = [contextPrefix, ...convertToCoreMessages(messages)];
 	} else {
 		// When no files are explicitly selected, query across all of the user's files.
 		let fileIds = selectedFileIds;
 		if (fileIds.length === 0) {
-			const userFiles = await listFiles({email: userEmail});
-			fileIds = userFiles.map(f => f.id);
+			const userFiles = await listFiles({ email: userEmail });
+			fileIds = userFiles.map((f) => f.id);
 		}
 
 		const ragResult = await retrieveAndAugment({
@@ -112,7 +114,7 @@ export async function POST(request: Request) {
 	return createDataStreamResponse({
 		execute(dataStream) {
 			if (sources.length > 0) {
-				dataStream.writeMessageAnnotation({sources});
+				dataStream.writeMessageAnnotation({ sources });
 			}
 
 			const result = streamText({
@@ -120,7 +122,7 @@ export async function POST(request: Request) {
 				temperature: 0,
 				system,
 				messages: augmentedMessages,
-				async onFinish({text}) {
+				async onFinish({ text }) {
 					if (noteContext) {
 						return;
 					}
@@ -133,7 +135,7 @@ export async function POST(request: Request) {
 								id,
 								role: 'assistant' as const,
 								content: text,
-								annotations: sources.length > 0 ? [{sources}] : undefined,
+								annotations: sources.length > 0 ? [{ sources }] : undefined,
 							},
 						],
 						author: userEmail,

@@ -1,4 +1,4 @@
-import {Buffer} from 'node:buffer';
+import { Buffer } from 'node:buffer';
 import pdf from 'pdf-parse';
 
 export async function getPdfContentFromUrl(url: string): Promise<string> {

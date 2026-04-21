@@ -1,9 +1,9 @@
-import {type Message} from 'ai';
+import type { Message } from 'ai';
 import {
 	createMessage as dbCreateMessage,
-	getChatsByUser,
-	getChatById,
 	deleteChatById as dbDeleteChatById,
+	getChatById,
+	getChatsByUser,
 	insertAuditLog,
 } from '@/app/db';
 
@@ -16,24 +16,24 @@ export async function saveMessage({
 	messages: Message[];
 	author: string;
 }) {
-	return dbCreateMessage({id, messages, author});
+	return dbCreateMessage({ id, messages, author });
 }
 
-export async function listChats({email}: {email: string}) {
-	return getChatsByUser({email});
+export async function listChats({ email }: { email: string }) {
+	return getChatsByUser({ email });
 }
 
-export async function getChat({id}: {id: string}) {
-	return getChatById({id});
+export async function getChat({ id }: { id: string }) {
+	return getChatById({ id });
 }
 
-export async function deleteChat({id, userEmail}: {id: string; userEmail: string}) {
-	const chat = await getChatById({id});
+export async function deleteChat({ id, userEmail }: { id: string; userEmail: string }) {
+	const chat = await getChatById({ id });
 	if (chat?.author !== userEmail) {
 		return null;
 	}
 
-	await dbDeleteChatById({id});
+	await dbDeleteChatById({ id });
 	await insertAuditLog({
 		actor: userEmail,
 		action: 'delete_chat',

@@ -1,13 +1,9 @@
-import {
-	describe, it, expect, vi, beforeEach,
-} from 'vitest';
-import {type Session} from 'next-auth';
-import {GET as getHistory, DELETE as deleteHistory} from '@/app/(chat)/api/history/route';
-import {type Chat} from '@/schema';
+import type { Session } from 'next-auth';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DELETE as deleteHistory, GET as getHistory } from '@/app/(chat)/api/history/route';
+import type { Chat } from '@/schema';
 
-const {
-	mockAuth, mockListChats, mockDeleteChat,
-} = vi.hoisted(() => ({
+const { mockAuth, mockListChats, mockDeleteChat } = vi.hoisted(() => ({
 	mockAuth: vi.fn(),
 	mockListChats: vi.fn(),
 	mockDeleteChat: vi.fn(),
@@ -23,7 +19,7 @@ vi.mock('@/services/chat', () => ({
 }));
 
 function mockSession(email: string): Session {
-	return {user: {email}, expires: '2099-01-01'};
+	return { user: { email }, expires: '2099-01-01' };
 }
 
 describe('GET /api/history', () => {
@@ -38,26 +34,38 @@ describe('GET /api/history', () => {
 	});
 
 	it('returns 401 when session has no user', async () => {
-		mockAuth.mockResolvedValue({expires: ''});
+		mockAuth.mockResolvedValue({ expires: '' });
 		const response = await getHistory();
 		expect(response.status).toBe(401);
 	});
 
 	it('returns chats for authenticated user', async () => {
 		const now = new Date();
-		const chats: Chat[] = [{
-			id: '1', author: 'a@b.com', messages: [], createdAt: now, deletedAt: null,
-		}];
+		const chats: Chat[] = [
+			{
+				id: '1',
+				author: 'a@b.com',
+				messages: [],
+				createdAt: now,
+				deletedAt: null,
+			},
+		];
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
 		mockListChats.mockResolvedValue(chats);
 
 		const response = await getHistory();
 		const body: unknown = await response.json();
 
-		expect(mockListChats).toHaveBeenCalledWith({email: 'a@b.com'});
-		expect(body).toEqual([{
-			id: '1', author: 'a@b.com', messages: [], createdAt: now.toISOString(), deletedAt: null,
-		}]);
+		expect(mockListChats).toHaveBeenCalledWith({ email: 'a@b.com' });
+		expect(body).toEqual([
+			{
+				id: '1',
+				author: 'a@b.com',
+				messages: [],
+				createdAt: now.toISOString(),
+				deletedAt: null,
+			},
+		]);
 	});
 });
 
@@ -91,14 +99,17 @@ describe('DELETE /api/history', () => {
 	it('deletes chat and returns empty object on success', async () => {
 		mockAuth.mockResolvedValue(mockSession('a@b.com'));
 		mockDeleteChat.mockResolvedValue({
-			id: '1', author: 'a@b.com', messages: [], createdAt: new Date(),
+			id: '1',
+			author: 'a@b.com',
+			messages: [],
+			createdAt: new Date(),
 		});
 
 		const request = new Request('http://localhost/api/history?id=1');
 		const response = await deleteHistory(request);
 		const body: unknown = await response.json();
 
-		expect(mockDeleteChat).toHaveBeenCalledWith({id: '1', userEmail: 'a@b.com'});
+		expect(mockDeleteChat).toHaveBeenCalledWith({ id: '1', userEmail: 'a@b.com' });
 		expect(body).toEqual({});
 	});
 });

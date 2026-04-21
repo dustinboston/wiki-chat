@@ -8,8 +8,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "xo",
-    "lint:fix": "xo --fix",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "format": "biome format --write",
+    "check": "biome check --write --unsafe",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
@@ -53,6 +55,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.12",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/d3-scale": "^4.0.8",
@@ -70,10 +73,9 @@
     "tailwindcss": "^3.4.1",
     "tsx": "^4.15.7",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.4",
-    "xo": "^2.0.2"
+    "vitest": "^4.1.4"
   },
   "lint-staged": {
-    "*.{ts,tsx}": "xo --fix"
+    "*.{ts,tsx,js,jsx,mjs,cjs,json,css}": "biome check --write --no-errors-on-unmatched"
   }
 }

@@ -1,21 +1,20 @@
-import {openai} from '@ai-sdk/openai';
-import {RecursiveCharacterTextSplitter} from '@langchain/textsplitters';
-import {embedMany} from 'ai';
+import { openai } from '@ai-sdk/openai';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
+import { embedMany } from 'ai';
 import {
 	createFile as dbCreateFile,
+	deleteChunksByFileId as dbDeleteChunksByFileId,
+	deleteFileById as dbDeleteFileById,
 	insertChunks as dbInsertChunks,
 	insertFileSources as dbInsertFileSources,
-	deleteChunksByFileId as dbDeleteChunksByFileId,
 	getChunksByFileIds,
-	getFilesByUser,
-	getFileById,
-	deleteFileById as dbDeleteFileById,
-	insertAuditLog,
-	getSourcesByFileId,
 	getDerivedFilesByFileId,
-	getTopChunksForFileIds,
+	getFileById,
+	getFilesByUser,
+	getSourcesByFileId,
+	insertAuditLog,
 } from '@/app/db';
-import type {FileSourceType} from '@/schema';
+import type { FileSourceType } from '@/schema';
 
 export async function createFileWithChunks({
 	pathname,
@@ -29,11 +28,19 @@ export async function createFileWithChunks({
 	title: string | null;
 	userEmail: string;
 	sourceType: FileSourceType;
-	chunks: Array<{content: string; embedding: number[]}>;
-	sourceChunks: Array<{chunkId: string; fileId: number; similarity: number; quotedText?: string | null}>;
+	chunks: Array<{ content: string; embedding: number[] }>;
+	sourceChunks: Array<{
+		chunkId: string;
+		fileId: number;
+		similarity: number;
+		quotedText?: string | null;
+	}>;
 }) {
 	const fileRecord = await dbCreateFile({
-		pathname, title, userEmail, sourceType,
+		pathname,
+		title,
+		userEmail,
+		sourceType,
 	});
 
 	await dbInsertChunks({
@@ -47,7 +54,7 @@ export async function createFileWithChunks({
 
 	if (sourceChunks.length > 0) {
 		await dbInsertFileSources({
-			sources: sourceChunks.map(sc => ({
+			sources: sourceChunks.map((sc) => ({
 				fileId: fileRecord.id,
 				sourceChunkId: sc.chunkId,
 				similarity: sc.similarity,
@@ -59,22 +66,22 @@ export async function createFileWithChunks({
 	return fileRecord;
 }
 
-export async function listFiles({email}: {email: string}) {
-	return getFilesByUser({email});
+export async function listFiles({ email }: { email: string }) {
+	return getFilesByUser({ email });
 }
 
-export async function getFile({id}: {id: number}) {
-	return getFileById({id});
+export async function getFile({ id }: { id: number }) {
+	return getFileById({ id });
 }
 
-export async function getFileContent({id, userEmail}: {id: number; userEmail: string}) {
-	const file = await getFileById({id});
+export async function getFileContent({ id, userEmail }: { id: number; userEmail: string }) {
+	const file = await getFileById({ id });
 	if (file?.userEmail !== userEmail) {
 		return null;
 	}
 
-	const chunks = await getChunksByFileIds({fileIds: [id]});
-	return {file, chunks};
+	const chunks = await getChunksByFileIds({ fileIds: [id] });
+	return { file, chunks };
 }
 
 export async function replaceFileContent({
@@ -86,24 +93,24 @@ export async function replaceFileContent({
 	userEmail: string;
 	content: string;
 }) {
-	const file = await getFileById({id});
+	const file = await getFileById({ id });
 	if (!file || file.userEmail !== userEmail) {
-		return {ok: false, reason: 'not_found'} as const;
+		return { ok: false, reason: 'not_found' } as const;
 	}
 
 	if (file.sourceType !== 'manual' && file.sourceType !== 'generated') {
-		return {ok: false, reason: 'forbidden_source_type'} as const;
+		return { ok: false, reason: 'forbidden_source_type' } as const;
 	}
 
-	const textSplitter = new RecursiveCharacterTextSplitter({chunkSize: 1000});
+	const textSplitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000 });
 	const chunkedContent = await textSplitter.createDocuments([content]);
 
-	const {embeddings} = await embedMany({
+	const { embeddings } = await embedMany({
 		model: openai.embedding('text-embedding-3-small'),
-		values: chunkedContent.map(c => c.pageContent),
+		values: chunkedContent.map((c) => c.pageContent),
 	});
 
-	await dbDeleteChunksByFileId({fileId: id});
+	await dbDeleteChunksByFileId({ fileId: id });
 
 	await dbInsertChunks({
 		chunks: chunkedContent.map((c, i) => ({
@@ -121,16 +128,16 @@ export async function replaceFileContent({
 		resourceId: String(id),
 	});
 
-	return {ok: true} as const;
+	return { ok: true } as const;
 }
 
-export async function deleteFile({id, userEmail}: {id: number; userEmail: string}) {
-	const file = await getFileById({id});
+export async function deleteFile({ id, userEmail }: { id: number; userEmail: string }) {
+	const file = await getFileById({ id });
 	if (file?.userEmail !== userEmail) {
 		return null;
 	}
 
-	await dbDeleteFileById({id});
+	await dbDeleteFileById({ id });
 	await insertAuditLog({
 		actor: userEmail,
 		action: 'delete_file',
@@ -140,19 +147,22 @@ export async function deleteFile({id, userEmail}: {id: number; userEmail: string
 	return file;
 }
 
-export async function getFileSources({id, userEmail}: {id: number; userEmail: string}) {
-	const file = await getFileById({id});
+export async function getFileSources({ id, userEmail }: { id: number; userEmail: string }) {
+	const file = await getFileById({ id });
 	if (file?.userEmail !== userEmail) {
 		return null;
 	}
 
-	const rawSources = await getSourcesByFileId({fileId: id});
-	const sourceMap = new Map<number, {
-		fileId: number;
-		title: string | null;
-		pathname: string;
-		similarity: number;
-	}>();
+	const rawSources = await getSourcesByFileId({ fileId: id });
+	const sourceMap = new Map<
+		number,
+		{
+			fileId: number;
+			title: string | null;
+			pathname: string;
+			similarity: number;
+		}
+	>();
 
 	for (const row of rawSources) {
 		const existing = sourceMap.get(row.sourceFileId);
@@ -166,17 +176,19 @@ export async function getFileSources({id, userEmail}: {id: number; userEmail: st
 		}
 	}
 
-	const sources = [...sourceMap.values()]
-		.toSorted((a, b) => b.similarity - a.similarity);
+	const sources = [...sourceMap.values()].toSorted((a, b) => b.similarity - a.similarity);
 
-	const derivedRows = await getDerivedFilesByFileId({fileId: id});
-	const derivedMap = new Map<number, {
-		fileId: number;
-		title: string | null;
-		pathname: string;
-		sourceType: FileSourceType;
-		highlights: Array<{quotedText: string | null; sourceChunkId: string}>;
-	}>();
+	const derivedRows = await getDerivedFilesByFileId({ fileId: id });
+	const derivedMap = new Map<
+		number,
+		{
+			fileId: number;
+			title: string | null;
+			pathname: string;
+			sourceType: FileSourceType;
+			highlights: Array<{ quotedText: string | null; sourceChunkId: string }>;
+		}
+	>();
 
 	for (const row of derivedRows) {
 		let entry = derivedMap.get(row.derivedFileId);
@@ -204,4 +216,4 @@ export async function getFileSources({id, userEmail}: {id: number; userEmail: st
 	};
 }
 
-export {getChunksByFileIds, getTopChunksForFileIds} from '@/app/db';
+export { getChunksByFileIds, getTopChunksForFileIds } from '@/app/db';

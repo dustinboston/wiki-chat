@@ -1,12 +1,12 @@
-import {notFound} from 'next/navigation';
-import {type Chat} from '@/schema';
-import {getChat} from '@/services/chat';
-import {Chat as PreviewChat} from '@/components/chat';
-import {auth} from '@/app/(auth)/auth';
+import { notFound } from 'next/navigation';
+import { auth } from '@/app/(auth)/auth';
+import { Chat as PreviewChat } from '@/components/chat';
+import type { Chat } from '@/schema';
+import { getChat } from '@/services/chat';
 
-export default async function Page({params}: {params: Promise<{id: string}>}) {
-	const {id} = await params;
-	const chatFromDb = await getChat({id});
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+	const { id } = await params;
+	const chatFromDb = await getChat({ id });
 
 	if (!chatFromDb) {
 		notFound();
@@ -20,10 +20,5 @@ export default async function Page({params}: {params: Promise<{id: string}>}) {
 		notFound();
 	}
 
-	return (
-		<PreviewChat
-			id={chat.id}
-			initialMessages={chat.messages}
-		/>
-	);
+	return <PreviewChat id={chat.id} initialMessages={chat.messages} />;
 }

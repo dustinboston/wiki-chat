@@ -1,7 +1,7 @@
-import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-import {defineConfig} from 'vitest/config';
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vitest/config';
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 

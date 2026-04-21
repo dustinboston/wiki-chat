@@ -1,16 +1,18 @@
 'use client';
 
-import {useSidebar} from './sidebar-context';
-import {MenuIcon} from './icons';
+import { MenuIcon } from './icons';
+import { useSidebar } from './sidebar-context';
 
 export const SidebarToggle = () => {
-	const {toggleSidebar} = useSidebar();
+	const { toggleSidebar } = useSidebar();
 	return (
-		<div
-			className='md:hidden dark:text-zinc-400 text-zinc-500 cursor-pointer'
+		<button
+			type="button"
+			aria-label="Toggle sidebar"
+			className="cursor-pointer text-zinc-500 md:hidden dark:text-zinc-400"
 			onClick={toggleSidebar}
 		>
 			<MenuIcon />
-		</div>
+		</button>
 	);
 };

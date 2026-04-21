@@ -1,17 +1,16 @@
 /* eslint-disable @typescript-eslint/strict-void-return */
 'use client';
 
-import {
-	useState, useRef, useEffect, useMemo,
-} from 'react';
-import useSWR from 'swr';
-import Link from 'next/link';
 import cx from 'classnames';
 import Fuse from 'fuse.js';
-import {useParams, usePathname} from 'next/navigation';
-import {FilePlusCorner, LogOut, MessageCirclePlus} from 'lucide-react';
-import {useSidebar} from './sidebar-context';
-import {NoteComposer} from './note-composer';
+import { FilePlusCorner, LogOut, MessageCirclePlus } from 'lucide-react';
+import Link from 'next/link';
+import { useParams, usePathname } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import useSWR from 'swr';
+import { logout } from '@/app/(auth)/actions';
+import type { Chat } from '@/schema';
+import { type AppError, fetcher } from '@/utils/functions';
 import {
 	CheckedSquare,
 	ChevronRightIcon,
@@ -21,9 +20,8 @@ import {
 	UncheckedSquare,
 	UploadIcon,
 } from './icons';
-import {logout} from '@/app/(auth)/actions';
-import {type AppError, fetcher} from '@/utils/functions';
-import {type Chat} from '@/schema';
+import { NoteComposer } from './note-composer';
+import { useSidebar } from './sidebar-context';
 
 type FileEntry = {
 	id: number;
@@ -42,36 +40,35 @@ function FileListItem({
 	onToggleSelect: () => void;
 }) {
 	const displayName = file.title ?? file.pathname;
-	const sourceLabel = file.sourceType === 'generated' ? 'GEN' : (file.sourceType === 'manual' ? 'NOTE' : undefined);
+	const sourceLabel =
+		file.sourceType === 'generated' ? 'GEN' : file.sourceType === 'manual' ? 'NOTE' : undefined;
 
 	return (
 		<div
 			className={cx(
-				'flex flex-row items-center gap-3 p-2 border-b dark:border-zinc-700',
-				isSelected && 'bg-zinc-100 dark:bg-zinc-700 dark:border-zinc-600',
+				'flex flex-row items-center gap-3 border-b p-2 dark:border-zinc-700',
+				isSelected && 'bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-700',
 			)}
 		>
 			<button
-				type='button'
+				type="button"
 				onClick={onToggleSelect}
 				aria-label={isSelected ? 'Deselect file' : 'Select file'}
 				className={cx(
-					'cursor-pointer flex-shrink-0',
-					isSelected
-						? 'text-blue-600 dark:text-zinc-50'
-						: 'text-zinc-500',
+					'flex-shrink-0 cursor-pointer',
+					isSelected ? 'text-blue-600 dark:text-zinc-50' : 'text-zinc-500',
 				)}
 			>
 				{isSelected ? <CheckedSquare /> : <UncheckedSquare />}
 			</button>
 			<Link
 				href={`/notes/${file.id}`}
-				className='flex-1 min-w-0 text-sm text-zinc-500 dark:text-zinc-400 truncate hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors'
+				className="min-w-0 flex-1 truncate text-sm text-zinc-500 transition-colors hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
 			>
 				{displayName}
 			</Link>
 			{sourceLabel && (
-				<span className='flex-shrink-0 text-[10px] px-1 py-0.5 rounded bg-zinc-200 dark:bg-zinc-600 text-zinc-500 dark:text-zinc-400'>
+				<span className="flex-shrink-0 rounded bg-zinc-200 px-1 py-0.5 text-[10px] text-zinc-500 dark:bg-zinc-600 dark:text-zinc-400">
 					{sourceLabel}
 				</span>
 			)}
@@ -96,16 +93,14 @@ function FilesTabContent({
 }) {
 	if (isLoading) {
 		return (
-			<div className='flex flex-col'>
-				{[44, 32, 52].map(item => (
+			<div className="flex flex-col">
+				{[44, 32, 52].map((item) => (
 					<div
 						key={item}
-						className='flex flex-row gap-4 p-2 border-b dark:border-zinc-700 items-center'
+						className="flex flex-row items-center gap-4 border-b p-2 dark:border-zinc-700"
 					>
-						<div className='size-4 bg-zinc-200 dark:bg-zinc-600 animate-pulse' />
-						<div
-							className={`w-${item} h-4 bg-zinc-200 dark:bg-zinc-600 animate-pulse`}
-						/>
+						<div className="size-4 animate-pulse bg-zinc-200 dark:bg-zinc-600" />
+						<div className={`w-${item} h-4 animate-pulse bg-zinc-200 dark:bg-zinc-600`} />
 					</div>
 				))}
 			</div>
@@ -114,7 +109,7 @@ function FilesTabContent({
 
 	if (files?.length === 0 && uploadQueue.length === 0) {
 		return (
-			<div className='flex flex-col gap-2 items-center justify-center h-full text-zinc-500 dark:text-zinc-400 text-sm'>
+			<div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
 				<InfoIcon />
 				<div>{searchQuery ? 'No matching files' : 'No files found'}</div>
 			</div>
@@ -122,8 +117,8 @@ function FilesTabContent({
 	}
 
 	return (
-		<div className='flex flex-col h-full'>
-			{files?.map(file => (
+		<div className="flex h-full flex-col">
+			{files?.map((file) => (
 				<FileListItem
 					key={file.id}
 					file={file}
@@ -134,12 +129,12 @@ function FilesTabContent({
 				/>
 			))}
 
-			{uploadQueue.map(fileName => (
-				<div key={fileName} className='flex flex-row p-2 gap-4 items-center'>
-					<div className='text-zinc-500 animate-spin'>
+			{uploadQueue.map((fileName) => (
+				<div key={fileName} className="flex flex-row items-center gap-4 p-2">
+					<div className="animate-spin text-zinc-500">
 						<LoaderIcon />
 					</div>
-					<div className='text-sm text-zinc-400'>{fileName}</div>
+					<div className="text-sm text-zinc-400">{fileName}</div>
 				</div>
 			))}
 		</div>
@@ -161,37 +156,36 @@ function HistoryListItem({
 }) {
 	return (
 		<div
-			className={cx(
-				'flex flex-row items-center p-2 border-b dark:border-zinc-700',
-				{'dark:bg-zinc-700 bg-zinc-200': isActive},
-			)}
+			className={cx('flex flex-row items-center border-b p-2 dark:border-zinc-700', {
+				'bg-zinc-200 dark:bg-zinc-700': isActive,
+			})}
 		>
 			<Link
 				href={`/${chat.id}`}
-				className='flex-1 min-w-0 text-sm dark:text-zinc-400 dark:hover:text-zinc-200 hover:text-zinc-900 truncate'
+				className="min-w-0 flex-1 truncate text-sm hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
 				onClick={onNavigate}
 			>
 				{chat.messages[0].content}
 			</Link>
-			<div
-				className='text-zinc-500 hover:bg-red-100 dark:text-zinc-500 hover:dark:bg-zinc-600 hover:text-red-500 p-1 px-2 cursor-pointer rounded-md flex-shrink-0'
+			<button
+				type="button"
+				aria-label="Delete chat"
+				className="flex-shrink-0 cursor-pointer rounded-md p-1 px-2 text-zinc-500 hover:bg-red-100 hover:text-red-500 dark:text-zinc-500 hover:dark:bg-zinc-600"
 				onClick={onDelete}
 			>
-				{isDeleting
-					? (
-						<div className='animate-spin'>
-							<LoaderIcon />
-						</div>
-					)
-					: (
-						<TrashIcon />
-					)}
-			</div>
+				{isDeleting ? (
+					<div className="animate-spin">
+						<LoaderIcon />
+					</div>
+				) : (
+					<TrashIcon />
+				)}
+			</button>
 			<Link
 				href={`/${chat.id}`}
-				className='text-zinc-500 hover:bg-zinc-200 dark:text-zinc-500 hover:dark:bg-zinc-600 p-1 px-1 cursor-pointer rounded-md flex-shrink-0'
+				className="flex-shrink-0 cursor-pointer rounded-md p-1 px-1 text-zinc-500 hover:bg-zinc-200 dark:text-zinc-500 hover:dark:bg-zinc-600"
 				onClick={onNavigate}
-				title='Open chat'
+				title="Open chat"
 			>
 				<ChevronRightIcon />
 			</Link>
@@ -220,7 +214,7 @@ function HistoryTabContent({
 }) {
 	if (historyError?.status === 401) {
 		return (
-			<div className='text-zinc-500 h-full flex flex-row justify-center items-center text-sm gap-2'>
+			<div className="flex h-full flex-row items-center justify-center gap-2 text-sm text-zinc-500">
 				<InfoIcon />
 				<div>Login to save and revisit previous chats!</div>
 			</div>
@@ -229,12 +223,10 @@ function HistoryTabContent({
 
 	if (isLoading) {
 		return (
-			<div className='flex flex-col'>
-				{[44, 32, 28, 52].map(item => (
-					<div key={item} className='p-2 border-b dark:border-zinc-700'>
-						<div
-							className={`w-${item} h-[20px] bg-zinc-200 dark:bg-zinc-600 animate-pulse`}
-						/>
+			<div className="flex flex-col">
+				{[44, 32, 28, 52].map((item) => (
+					<div key={item} className="border-b p-2 dark:border-zinc-700">
+						<div className={`w-${item} h-[20px] animate-pulse bg-zinc-200 dark:bg-zinc-600`} />
 					</div>
 				))}
 			</div>
@@ -243,7 +235,7 @@ function HistoryTabContent({
 
 	if (history?.length === 0) {
 		return (
-			<div className='text-zinc-500 h-full flex flex-row justify-center items-center text-sm gap-2'>
+			<div className="flex h-full flex-row items-center justify-center gap-2 text-sm text-zinc-500">
 				<InfoIcon />
 				<div>{searchQuery ? 'No matching chats' : 'No chats found'}</div>
 			</div>
@@ -251,8 +243,8 @@ function HistoryTabContent({
 	}
 
 	return (
-		<div className='flex flex-col h-full'>
-			{history?.map(chat => (
+		<div className="flex h-full flex-col">
+			{history?.map((chat) => (
 				<HistoryListItem
 					key={chat.id}
 					chat={chat}
@@ -272,7 +264,7 @@ export const Sidebar = () => {
 	const parameters = useParams();
 	const rawId = parameters.id;
 	const chatId = typeof rawId === 'string' ? rawId : undefined;
-	const pathname = usePathname();
+	const _pathname = usePathname();
 	const {
 		selectedFileIds,
 		setSelectedFileIds,
@@ -308,11 +300,10 @@ export const Sidebar = () => {
 
 	useEffect(() => {
 		void mutateHistory();
-	}, [pathname, mutateHistory]);
+	}, [mutateHistory]);
 
 	const fileFuse = useMemo(
-		() =>
-			new Fuse(files ?? [], {keys: ['title', 'pathname'], threshold: 0.4}),
+		() => new Fuse(files ?? [], { keys: ['title', 'pathname'], threshold: 0.4 }),
 		[files],
 	);
 
@@ -331,11 +322,11 @@ export const Sidebar = () => {
 	);
 
 	const filteredFiles = searchQuery
-		? fileFuse.search(searchQuery).map(result => result.item)
+		? fileFuse.search(searchQuery).map((result) => result.item)
 		: files;
 
 	const filteredHistory = searchQuery
-		? historyFuse.search(searchQuery).map(result => result.item)
+		? historyFuse.search(searchQuery).map((result) => result.item)
 		: history;
 
 	const handleDeleteChat = (id: string) => {
@@ -345,18 +336,17 @@ export const Sidebar = () => {
 		}
 
 		void (async () => {
-			setDeleteChatQueue(queue => [...queue, id]);
-			await fetch(`/api/history?id=${id}`, {method: 'DELETE'});
-			setDeleteChatQueue(queue => queue.filter(qid => qid !== id));
-			void mutateHistory(history?.filter(entry => entry.id !== id));
+			setDeleteChatQueue((queue) => [...queue, id]);
+			await fetch(`/api/history?id=${id}`, { method: 'DELETE' });
+			setDeleteChatQueue((queue) => queue.filter((qid) => qid !== id));
+			void mutateHistory(history?.filter((entry) => entry.id !== id));
 		})();
 	};
 
 	const handleToggleFileSelect = (fileId: number) => {
-		setSelectedFileIds(current =>
-			current.includes(fileId)
-				? current.filter(id => id !== fileId)
-				: [...current, fileId]);
+		setSelectedFileIds((current) =>
+			current.includes(fileId) ? current.filter((id) => id !== fileId) : [...current, fileId],
+		);
 	};
 
 	const closeSidebar = () => {
@@ -366,10 +356,13 @@ export const Sidebar = () => {
 	return (
 		<>
 			{/* Mobile overlay */}
-			<div
+			<button
+				type="button"
+				aria-label="Close sidebar"
+				tabIndex={isSidebarOpen ? 0 : -1}
 				className={cx(
-					'fixed inset-0 bg-zinc-900/50 z-40 md:hidden transition-opacity duration-300',
-					isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
+					'fixed inset-0 z-40 bg-zinc-900/50 transition-opacity duration-300 md:hidden',
+					isSidebarOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
 				)}
 				onClick={closeSidebar}
 			/>
@@ -377,64 +370,62 @@ export const Sidebar = () => {
 			{/* Sidebar */}
 			<aside
 				className={cx(
-					'w-80 flex-shrink-0 flex flex-col bg-white dark:bg-zinc-800 border-r dark:border-zinc-700',
-					'fixed md:relative top-0 left-0 h-dvh md:h-full z-50 md:z-0',
+					'flex w-80 flex-shrink-0 flex-col border-r bg-white dark:border-zinc-700 dark:bg-zinc-800',
+					'fixed top-0 left-0 z-50 h-dvh md:relative md:z-0 md:h-full',
 					'transition-transform duration-300 ease-in-out',
-					isSidebarOpen
-						? 'translate-x-0'
-						: '-translate-x-full md:translate-x-0',
+					isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
 				)}
 			>
 				{/* Title */}
-				<div className='px-3 py-3 border-b dark:border-zinc-700'>
-					<div className='text-base font-semibold text-zinc-900 dark:text-zinc-100'>
-						Wiki Chat
-					</div>
+				<div className="border-b px-3 py-3 dark:border-zinc-700">
+					<div className="font-semibold text-base text-zinc-900 dark:text-zinc-100">Wiki Chat</div>
 				</div>
 
 				{/* Top: tabs + actions */}
-				<div className='p-3 flex flex-row items-center justify-between border-b dark:border-zinc-700'>
-					<div className='flex flex-row gap-1'>
+				<div className="flex flex-row items-center justify-between border-b p-3 dark:border-zinc-700">
+					<div className="flex flex-row gap-1">
 						<button
+							type="button"
 							onClick={() => {
 								setActiveTab('files');
 								setSearchQuery('');
 							}}
 							className={cx(
-								'text-sm px-2 py-1 rounded-md transition-colors',
+								'rounded-md px-2 py-1 text-sm transition-colors',
 								activeTab === 'files'
-									? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100'
-									: 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700',
+									? 'bg-zinc-200 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100'
+									: 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700',
 							)}
 						>
 							Files
 						</button>
 						<button
+							type="button"
 							onClick={() => {
 								setActiveTab('history');
 								setSearchQuery('');
 							}}
 							className={cx(
-								'text-sm px-2 py-1 rounded-md transition-colors',
+								'rounded-md px-2 py-1 text-sm transition-colors',
 								activeTab === 'history'
-									? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100'
-									: 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700',
+									? 'bg-zinc-200 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100'
+									: 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700',
 							)}
 						>
 							History
 						</button>
 					</div>
 
-					<div className='flex flex-row gap-1'>
+					<div className="flex flex-row gap-1">
 						<input
-							name='file'
+							name="file"
 							ref={inputFileRef}
-							type='file'
+							type="file"
 							required
-							className='hidden'
-							accept='application/pdf'
+							className="hidden"
+							accept="application/pdf"
 							multiple={false}
-							onChange={event => {
+							onChange={(event) => {
 								const file = event.target.files?.[0];
 								if (file) {
 									void (async () => {
@@ -446,30 +437,32 @@ export const Sidebar = () => {
 								}
 							}}
 						/>
-						<div
-							className='dark:text-zinc-400 dark:bg-zinc-700 hover:dark:bg-zinc-600 bg-zinc-100 hover:bg-zinc-200 p-1.5 rounded-md cursor-pointer'
+						<button
+							type="button"
+							aria-label="Upload a file"
+							title="Upload a file"
+							className="cursor-pointer rounded-md bg-zinc-100 p-1.5 hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-400 hover:dark:bg-zinc-600"
 							onClick={() => inputFileRef.current?.click()}
-							title='Upload a file'
 						>
 							<UploadIcon size={14} />
-						</div>
+						</button>
 						<button
-							type='button'
+							type="button"
 							onClick={() => {
 								setIsNoteComposerOpen(true);
 							}}
-							className='dark:text-zinc-400 dark:bg-zinc-700 hover:dark:bg-zinc-600 bg-zinc-100 hover:bg-zinc-200 p-1.5 rounded-md cursor-pointer'
-							title='New note'
-							aria-label='New note'
+							className="cursor-pointer rounded-md bg-zinc-100 p-1.5 hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-400 hover:dark:bg-zinc-600"
+							title="New note"
+							aria-label="New note"
 						>
 							<FilePlusCorner size={14} />
 						</button>
 						<Link
-							href='/'
-							className='dark:text-zinc-400 dark:bg-zinc-700 hover:dark:bg-zinc-600 bg-zinc-100 hover:bg-zinc-200 p-1.5 rounded-md cursor-pointer'
+							href="/"
+							className="cursor-pointer rounded-md bg-zinc-100 p-1.5 hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-400 hover:dark:bg-zinc-600"
 							onClick={closeSidebar}
-							title='New chat'
-							aria-label='New chat'
+							title="New chat"
+							aria-label="New chat"
 						>
 							<MessageCirclePlus size={14} />
 						</Link>
@@ -477,58 +470,54 @@ export const Sidebar = () => {
 				</div>
 
 				{/* Search */}
-				<div className='px-3 py-2 border-b dark:border-zinc-700'>
+				<div className="border-b px-3 py-2 dark:border-zinc-700">
 					<input
-						type='text'
-						placeholder={
-							activeTab === 'files' ? 'Search files...' : 'Search history...'
-						}
+						type="text"
+						placeholder={activeTab === 'files' ? 'Search files...' : 'Search history...'}
 						value={searchQuery}
-						onChange={event => {
+						onChange={(event) => {
 							setSearchQuery(event.target.value);
 						}}
-						className='w-full bg-zinc-100 dark:bg-zinc-700 rounded-md px-2 py-1 text-sm outline-none text-zinc-800 dark:text-zinc-300 placeholder:text-zinc-400'
+						className="w-full rounded-md bg-zinc-100 px-2 py-1 text-sm text-zinc-800 outline-none placeholder:text-zinc-400 dark:bg-zinc-700 dark:text-zinc-300"
 					/>
 				</div>
 
 				{/* Content */}
-				<div className='flex-1 overflow-y-auto'>
-					{activeTab === 'files'
-						? (
-							<FilesTabContent
-								isLoading={isFilesLoading}
-								files={filteredFiles}
-								searchQuery={searchQuery}
-								selectedFileIds={selectedFileIds}
-								uploadQueue={uploadQueue}
-								onToggleSelect={handleToggleFileSelect}
-							/>
-						)
-						: (
-							<HistoryTabContent
-								isLoading={isHistoryLoading && !historyError}
-								history={filteredHistory}
-								historyError={historyError}
-								searchQuery={searchQuery}
-								chatId={chatId}
-								deleteChatQueue={deleteChatQueue}
-								onDelete={handleDeleteChat}
-								onNavigate={closeSidebar}
-							/>
-						)}
+				<div className="flex-1 overflow-y-auto">
+					{activeTab === 'files' ? (
+						<FilesTabContent
+							isLoading={isFilesLoading}
+							files={filteredFiles}
+							searchQuery={searchQuery}
+							selectedFileIds={selectedFileIds}
+							uploadQueue={uploadQueue}
+							onToggleSelect={handleToggleFileSelect}
+						/>
+					) : (
+						<HistoryTabContent
+							isLoading={isHistoryLoading && !historyError}
+							history={filteredHistory}
+							historyError={historyError}
+							searchQuery={searchQuery}
+							chatId={chatId}
+							deleteChatQueue={deleteChatQueue}
+							onDelete={handleDeleteChat}
+							onNavigate={closeSidebar}
+						/>
+					)}
 				</div>
 
 				{/* Bottom: selection count + logout */}
-				<div className='p-3 border-t dark:border-zinc-700 flex flex-row items-center justify-between'>
-					<div className='text-zinc-500 dark:text-zinc-400 text-sm'>
+				<div className="flex flex-row items-center justify-between border-t p-3 dark:border-zinc-700">
+					<div className="text-sm text-zinc-500 dark:text-zinc-400">
 						{selectedFileIds.length}/{files?.length ?? 0} Selected
 					</div>
 					<form action={logout}>
 						<button
-							type='submit'
-							aria-label='Sign out'
-							title='Sign out'
-							className='dark:text-zinc-400 dark:bg-zinc-700 hover:dark:bg-zinc-600 bg-zinc-100 hover:bg-zinc-200 p-1.5 rounded-md cursor-pointer'
+							type="submit"
+							aria-label="Sign out"
+							title="Sign out"
+							className="cursor-pointer rounded-md bg-zinc-100 p-1.5 hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-400 hover:dark:bg-zinc-600"
 						>
 							<LogOut size={14} />
 						</button>

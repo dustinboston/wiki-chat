@@ -1,12 +1,8 @@
-import {
-	describe, it, expect, vi, beforeEach,
-} from 'vitest';
-import {
-	render, screen, fireEvent,
-} from '@testing-library/react';
-import {NotePopover} from '@/components/note-popover';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NotePopover } from '@/components/note-popover';
 
-const {mockUseSWR} = vi.hoisted(() => ({
+const { mockUseSWR } = vi.hoisted(() => ({
 	mockUseSWR: vi.fn(),
 }));
 
@@ -22,7 +18,10 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	mockUseSWR.mockReturnValue({
 		data: {
-			content: 'The note body', truncated: false, title: 'My note', pathname: 'note.md',
+			content: 'The note body',
+			truncated: false,
+			title: 'My note',
+			pathname: 'note.md',
 		},
 		error: undefined,
 		isLoading: false,
@@ -31,7 +30,7 @@ beforeEach(() => {
 
 describe('NotePopover', () => {
 	it('renders nothing when noteFileId is null', () => {
-		const {container} = render(<NotePopover noteFileId={null} onClose={noop} />);
+		const { container } = render(<NotePopover noteFileId={null} onClose={noop} />);
 		expect(container.textContent).toBe('');
 	});
 
@@ -44,21 +43,24 @@ describe('NotePopover', () => {
 	it('calls onClose when Close button is clicked', () => {
 		const onClose = vi.fn<() => void>();
 		render(<NotePopover noteFileId={42} onClose={onClose} />);
-		fireEvent.click(screen.getByRole('button', {name: /close/iv}));
+		fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 		expect(onClose).toHaveBeenCalledTimes(1);
 	});
 
 	it('calls onClose when Escape is pressed', () => {
 		const onClose = vi.fn<() => void>();
 		render(<NotePopover noteFileId={42} onClose={onClose} />);
-		fireEvent.keyDown(document.body, {key: 'Escape'});
+		fireEvent.keyDown(document.body, { key: 'Escape' });
 		expect(onClose).toHaveBeenCalledTimes(1);
 	});
 
 	it('falls back to pathname when title is missing', () => {
 		mockUseSWR.mockReturnValue({
 			data: {
-				content: 'body', truncated: false, title: null, pathname: 'note.md',
+				content: 'body',
+				truncated: false,
+				title: null,
+				pathname: 'note.md',
 			},
 			error: undefined,
 			isLoading: false,

@@ -1,5 +1,5 @@
-import {genSaltSync, hashSync} from 'bcrypt-ts';
-import {createUser as dbCreateUser} from '@/app/db';
+import { genSaltSync, hashSync } from 'bcrypt-ts';
+import { createUser as dbCreateUser } from '@/app/db';
 
 export async function hashPassword(password: string): Promise<string> {
 	const salt = genSaltSync(10);
@@ -11,4 +11,4 @@ export async function createUser(email: string, password: string) {
 	return dbCreateUser(email, hash);
 }
 
-export {getUser} from '@/app/db';
+export { getUser } from '@/app/db';

@@ -1,10 +1,6 @@
-import {
-	describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const {
-	mockGetFileById, mockGetSourcesByFileId, mockGetDerivedFilesByFileId,
-} = vi.hoisted(() => ({
+const { mockGetFileById, mockGetSourcesByFileId, mockGetDerivedFilesByFileId } = vi.hoisted(() => ({
 	mockGetFileById: vi.fn(),
 	mockGetSourcesByFileId: vi.fn(),
 	mockGetDerivedFilesByFileId: vi.fn(),
@@ -24,7 +20,7 @@ vi.mock('@/app/db', () => ({
 	getTopChunksForFileIds: vi.fn(),
 }));
 
-const {getFileSources} = await import('@/services/file');
+const { getFileSources } = await import('@/services/file');
 
 beforeEach(() => {
 	vi.clearAllMocks();
@@ -33,15 +29,25 @@ beforeEach(() => {
 describe('getFileSources', () => {
 	it('returns null when file does not belong to user', async () => {
 		mockGetFileById.mockResolvedValue({
-			id: 1, userEmail: 'other@x.com', pathname: 'f', title: null, sourceType: 'upload', createdAt: new Date(),
+			id: 1,
+			userEmail: 'other@x.com',
+			pathname: 'f',
+			title: null,
+			sourceType: 'upload',
+			createdAt: new Date(),
 		});
-		const result = await getFileSources({id: 1, userEmail: 'me@x.com'});
+		const result = await getFileSources({ id: 1, userEmail: 'me@x.com' });
 		expect(result).toBeNull();
 	});
 
 	it('aggregates multiple derived rows for the same file into one entry with highlights array', async () => {
 		mockGetFileById.mockResolvedValue({
-			id: 1, userEmail: 'me@x.com', pathname: 'article', title: 'Article', sourceType: 'upload', createdAt: new Date(),
+			id: 1,
+			userEmail: 'me@x.com',
+			pathname: 'article',
+			title: 'Article',
+			sourceType: 'upload',
+			createdAt: new Date(),
 		});
 		mockGetSourcesByFileId.mockResolvedValue([]);
 		mockGetDerivedFilesByFileId.mockResolvedValue([
@@ -71,18 +77,18 @@ describe('getFileSources', () => {
 			},
 		]);
 
-		const result = await getFileSources({id: 1, userEmail: 'me@x.com'});
+		const result = await getFileSources({ id: 1, userEmail: 'me@x.com' });
 
 		expect(result).not.toBeNull();
 		expect(result!.derived).toHaveLength(2);
 
-		const noteA = result!.derived.find(d => d.fileId === 10)!;
+		const noteA = result!.derived.find((d) => d.fileId === 10)!;
 		expect(noteA.highlights).toHaveLength(2);
 		expect(noteA.highlights[0].quotedText).toBe('first quote');
 		expect(noteA.highlights[1].quotedText).toBe('second quote');
 		expect(noteA.sourceType).toBe('manual');
 
-		const noteB = result!.derived.find(d => d.fileId === 11)!;
+		const noteB = result!.derived.find((d) => d.fileId === 11)!;
 		expect(noteB.highlights).toHaveLength(1);
 		expect(noteB.highlights[0].quotedText).toBeNull();
 	});

@@ -1,11 +1,11 @@
+import { compare } from 'bcrypt-ts';
 import nextAuth from 'next-auth';
 import credentials from 'next-auth/providers/credentials';
-import {compare} from 'bcrypt-ts';
-import {authConfig} from './auth.config';
-import {getUser} from '@/services/auth';
+import { getUser } from '@/services/auth';
+import { authConfig } from './auth.config';
 
 export const {
-	handlers: {GET, POST},
+	handlers: { GET, POST },
 	auth,
 	signIn,
 	signOut,
@@ -14,13 +14,13 @@ export const {
 	providers: [
 		credentials({
 			credentials: {
-				email: {label: 'Email', type: 'email'},
-				password: {label: 'Password', type: 'password'},
+				email: { label: 'Email', type: 'email' },
+				password: { label: 'Password', type: 'password' },
 			},
 			async authorize(credentialValues) {
 				if (
-					typeof credentialValues.email !== 'string'
-					|| typeof credentialValues.password !== 'string'
+					typeof credentialValues.email !== 'string' ||
+					typeof credentialValues.password !== 'string'
 				) {
 					return null;
 				}
@@ -35,12 +35,9 @@ export const {
 					return null;
 				}
 
-				const passwordsMatch = await compare(
-					credentialValues.password,
-					foundUser.password,
-				);
+				const passwordsMatch = await compare(credentialValues.password, foundUser.password);
 				if (passwordsMatch) {
-					return {id: foundUser.email, email: foundUser.email};
+					return { id: foundUser.email, email: foundUser.email };
 				}
 
 				return null;

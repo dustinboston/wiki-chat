@@ -1,7 +1,7 @@
 'use server';
 
-import {signIn, signOut} from './auth';
-import {createUser, getUser} from '@/services/auth';
+import { createUser, getUser } from '@/services/auth';
+import { signIn, signOut } from './auth';
 
 export async function logout(): Promise<void> {
 	await signOut();
@@ -12,7 +12,7 @@ export type LoginActionState = {
 };
 
 export const login = async (
-	data: LoginActionState,
+	_data: LoginActionState,
 	formData: FormData,
 ): Promise<LoginActionState> => {
 	try {
@@ -20,7 +20,7 @@ export const login = async (
 		const password = formData.get('password');
 
 		if (typeof email !== 'string' || typeof password !== 'string') {
-			return {status: 'failed'};
+			return { status: 'failed' };
 		}
 
 		await signIn('credentials', {
@@ -29,9 +29,9 @@ export const login = async (
 			redirect: false,
 		});
 
-		return {status: 'success'};
+		return { status: 'success' };
 	} catch {
-		return {status: 'failed'};
+		return { status: 'failed' };
 	}
 };
 
@@ -40,20 +40,20 @@ export type RegisterActionState = {
 };
 
 export const register = async (
-	data: RegisterActionState,
+	_data: RegisterActionState,
 	formData: FormData,
 ): Promise<RegisterActionState> => {
 	const email = formData.get('email');
 	const password = formData.get('password');
 
 	if (typeof email !== 'string' || typeof password !== 'string') {
-		return {status: 'failed'};
+		return { status: 'failed' };
 	}
 
 	const existingUser = await getUser(email);
 
 	if (existingUser.length > 0) {
-		return {status: 'user_exists'};
+		return { status: 'user_exists' };
 	}
 
 	await createUser(email, password);
@@ -62,5 +62,5 @@ export const register = async (
 		password,
 		redirect: false,
 	});
-	return {status: 'success'};
+	return { status: 'success' };
 };

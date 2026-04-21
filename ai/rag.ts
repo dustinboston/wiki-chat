@@ -1,11 +1,6 @@
-import {openai} from '@ai-sdk/openai';
-import {
-	embed,
-	generateObject,
-	generateText,
-	type CoreMessage,
-} from 'ai';
-import {getTopChunksForFileIds} from '@/services/file';
+import { openai } from '@ai-sdk/openai';
+import { type CoreMessage, embed, generateObject, generateText } from 'ai';
+import { getTopChunksForFileIds } from '@/services/file';
 
 export type SourceChunk = {
 	chunkId: string;
@@ -26,7 +21,7 @@ export async function retrieveAndAugment({
 	fileIds: number[];
 }): Promise<RagResult> {
 	if (fileIds.length === 0) {
-		return {messages, sources: []};
+		return { messages, sources: [] };
 	}
 
 	const augmented = [...messages];
@@ -37,19 +32,19 @@ export async function retrieveAndAugment({
 			augmented.push(recentMessage);
 		}
 
-		return {messages: augmented, sources: []};
+		return { messages: augmented, sources: [] };
 	}
 
-	const lastUserMessageContent
-		= typeof recentMessage.content === 'string'
+	const lastUserMessageContent =
+		typeof recentMessage.content === 'string'
 			? recentMessage.content
 			: recentMessage.content
-				.filter(part => part.type === 'text')
-				.map(part => part.text)
-				.join('\n');
+					.filter((part) => part.type === 'text')
+					.map((part) => part.text)
+					.join('\n');
 
-	const {object: classification} = await generateObject({
-		model: openai('gpt-4o-mini', {structuredOutputs: true}),
+	const { object: classification } = await generateObject({
+		model: openai('gpt-4o-mini', { structuredOutputs: true }),
 		output: 'enum',
 		enum: ['question', 'statement', 'other'],
 		system: 'classify the user message as a question, statement, or other',
@@ -58,16 +53,16 @@ export async function retrieveAndAugment({
 
 	if (classification !== 'question') {
 		augmented.push(recentMessage);
-		return {messages: augmented, sources: []};
+		return { messages: augmented, sources: [] };
 	}
 
-	const {text: hypotheticalAnswer} = await generateText({
-		model: openai('gpt-4o-mini', {structuredOutputs: true}),
+	const { text: hypotheticalAnswer } = await generateText({
+		model: openai('gpt-4o-mini', { structuredOutputs: true }),
 		system: 'Answer the users question:',
 		prompt: lastUserMessageContent,
 	});
 
-	const {embedding: hypotheticalAnswerEmbedding} = await embed({
+	const { embedding: hypotheticalAnswerEmbedding } = await embed({
 		model: openai.embedding('text-embedding-3-small'),
 		value: hypotheticalAnswer,
 	});
@@ -82,24 +77,24 @@ export async function retrieveAndAugment({
 		role: 'user',
 		content: [
 			...(typeof recentMessage.content === 'string'
-				? [{type: 'text' as const, text: recentMessage.content}]
+				? [{ type: 'text' as const, text: recentMessage.content }]
 				: recentMessage.content),
 			{
 				type: 'text',
 				text: 'Here is some relevant information that you can use to answer the question:',
 			},
-			...topKChunks.map(chunk => ({
+			...topKChunks.map((chunk) => ({
 				type: 'text' as const,
 				text: chunk.content,
 			})),
 		],
 	});
 
-	const sources: SourceChunk[] = topKChunks.map(chunk => ({
+	const sources: SourceChunk[] = topKChunks.map((chunk) => ({
 		chunkId: chunk.id,
 		fileId: chunk.fileId,
 		similarity: chunk.similarity,
 	}));
 
-	return {messages: augmented, sources};
+	return { messages: augmented, sources };
 }

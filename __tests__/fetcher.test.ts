@@ -1,7 +1,5 @@
-import {
-	describe, it, expect, vi, beforeEach,
-} from 'vitest';
-import {AppError, fetcher} from '@/utils/functions';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppError, fetcher } from '@/utils/functions';
 
 describe('fetcher', () => {
 	beforeEach(() => {
@@ -9,7 +7,7 @@ describe('fetcher', () => {
 	});
 
 	it('returns parsed JSON on successful response', async () => {
-		const data = {items: [1, 2, 3]};
+		const data = { items: [1, 2, 3] };
 		vi.stubGlobal(
 			'fetch',
 			vi.fn().mockResolvedValue({

@@ -39,8 +39,10 @@ __tests__/      Test files
 pnpm dev            # Start dev server (localhost:3000)
 pnpm build          # Production build
 pnpm start          # Start production server
-pnpm lint           # Run xo (lint)
-pnpm lint:fix       # Run xo --fix
+pnpm lint           # Run biome check
+pnpm lint:fix       # Run biome check --write (safe autofixes)
+pnpm format         # Run biome format --write
+pnpm check          # Run biome check --write --unsafe (includes risky fixes)
 pnpm test           # Run tests (vitest)
 pnpm test:watch     # Run tests in watch mode
 pnpm test:coverage  # Run tests with coverage

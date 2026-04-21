@@ -1,16 +1,16 @@
-import {describe, it, expect} from 'vitest';
-import {NextRequest} from 'next/server';
-import {type Session} from 'next-auth';
-import {authConfig} from '@/app/(auth)/auth.config';
+import { NextRequest } from 'next/server';
+import type { Session } from 'next-auth';
+import { describe, expect, it } from 'vitest';
+import { authConfig } from '@/app/(auth)/auth.config';
 
-const {authorized} = authConfig.callbacks;
+const { authorized } = authConfig.callbacks;
 
 async function callAuthorized(pathname: string, loggedIn: boolean) {
 	const request = new NextRequest(new URL(`http://localhost${pathname}`));
 	const auth: Session | null = loggedIn
-		? {user: {email: 'test@test.com'}, expires: '2099-01-01'}
+		? { user: { email: 'test@test.com' }, expires: '2099-01-01' }
 		: null;
-	return authorized({auth, request});
+	return authorized({ auth, request });
 }
 
 describe('auth.config authorized callback', () => {
