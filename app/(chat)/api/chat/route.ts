@@ -77,7 +77,7 @@ export async function POST(request: Request) {
 
 	if (noteContext) {
 		const noteFile = await getFile({id: noteContext.fileId});
-		if (!noteFile || noteFile.userEmail !== userEmail) {
+		if (noteFile?.userEmail !== userEmail) {
 			return new Response('Forbidden', {status: 403});
 		}
 
@@ -87,7 +87,10 @@ export async function POST(request: Request) {
 
 		const contextPrefix: CoreMessage = {
 			role: 'system',
-			content: `The user is working on the note titled "${noteContext.title}". Its current contents are:\n\n${noteContext.content}\n\nWhen asked to expand, rewrite, or generate, produce a new complete note body that could replace the current contents.`,
+			content: `The user is working on the note titled "${noteContext.title}". `
+				+ `Its current contents are:\n\n${noteContext.content}\n\n`
+				+ 'When asked to expand, rewrite, or generate, produce a new complete '
+				+ 'note body that could replace the current contents.',
 		};
 		augmentedMessages = [contextPrefix, ...convertToCoreMessages(messages)];
 	} else {

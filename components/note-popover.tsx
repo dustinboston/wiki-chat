@@ -61,7 +61,11 @@ export function NotePopover({noteFileId, onClose}: NotePopoverProps) {
 					<button
 						type='button'
 						onClick={onClose}
-						className='text-xs px-2 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-zinc-600 dark:text-zinc-300 transition-colors flex-shrink-0 ml-3'
+						className={
+							'text-xs px-2 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 '
+							+ 'dark:bg-zinc-700 dark:hover:bg-zinc-600 text-zinc-600 dark:text-zinc-300 '
+							+ 'transition-colors flex-shrink-0 ml-3'
+						}
 					>
 						Close
 					</button>

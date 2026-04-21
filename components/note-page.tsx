@@ -227,6 +227,220 @@ type Selection = {
 	left: number;
 };
 
+type HighlightInput = {quotedText: string; noteFileId: number};
+
+function getHighlightsInput(sourcesData: SourcesData | undefined): HighlightInput[] {
+	const result: HighlightInput[] = [];
+	if (!sourcesData) {
+		return result;
+	}
+
+	for (const d of sourcesData.derived) {
+		if (d.sourceType !== 'manual') {
+			continue;
+		}
+
+		for (const h of d.highlights) {
+			if (h.quotedText && h.quotedText.length > 0) {
+				result.push({quotedText: h.quotedText, noteFileId: d.fileId});
+			}
+		}
+	}
+
+	return result;
+}
+
+type NoteHeaderActionsProps = {
+	isEditing: boolean;
+	isSaving: boolean;
+	isDeleting: boolean;
+	canExpand: boolean;
+	canEdit: boolean;
+	onNewNote: () => void;
+	onExpand: () => void;
+	onStartEdit: () => void;
+	onCancelEdit: () => void;
+	onSaveEdit: () => void;
+	onDelete: () => void;
+};
+
+function EditingActions({isSaving, onCancelEdit, onSaveEdit}: Pick<NoteHeaderActionsProps, 'isSaving' | 'onCancelEdit' | 'onSaveEdit'>) {
+	return (
+		<>
+			<button
+				type='button'
+				onClick={onCancelEdit}
+				disabled={isSaving}
+				className={
+					'text-sm px-3 py-1 rounded-md transition-colors '
+					+ 'bg-zinc-200 hover:bg-zinc-300 text-zinc-800 '
+					+ 'dark:bg-zinc-700 dark:hover:bg-zinc-600 dark:text-zinc-200 '
+					+ 'disabled:opacity-60 disabled:cursor-not-allowed'
+				}
+			>
+				Cancel
+			</button>
+			<button
+				type='button'
+				onClick={onSaveEdit}
+				disabled={isSaving}
+				className={
+					'text-sm px-3 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-50 '
+					+ 'transition-colors disabled:opacity-60 disabled:cursor-not-allowed'
+				}
+			>
+				{isSaving ? 'Saving…' : 'Save'}
+			</button>
+		</>
+	);
+}
+
+const iconButtonClass = 'p-1.5 rounded-md cursor-pointer transition-colors '
+	+ 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 '
+	+ 'dark:hover:text-zinc-200 dark:hover:bg-zinc-700';
+
+function ViewingActions({
+	isDeleting, canExpand, canEdit, onNewNote, onExpand, onStartEdit, onDelete,
+}: Omit<NoteHeaderActionsProps, 'isEditing' | 'isSaving' | 'onCancelEdit' | 'onSaveEdit'>) {
+	return (
+		<>
+			<button
+				type='button'
+				onClick={onNewNote}
+				title='New note'
+				aria-label='New note'
+				className={iconButtonClass}
+			>
+				<FilePlusCorner size={16} />
+			</button>
+			{canExpand && (
+				<button
+					type='button'
+					onClick={onExpand}
+					title='Expand with AI'
+					aria-label='Expand with AI'
+					className={iconButtonClass}
+				>
+					<Bot size={16} />
+				</button>
+			)}
+			{canEdit && (
+				<button
+					type='button'
+					onClick={onStartEdit}
+					title='Edit this note'
+					aria-label='Edit this note'
+					className={iconButtonClass}
+				>
+					<PencilEditIcon />
+				</button>
+			)}
+			<button
+				type='button'
+				onClick={onDelete}
+				disabled={isDeleting}
+				title='Delete this file'
+				aria-label='Delete this file'
+				className={
+					'p-1.5 rounded-md cursor-pointer transition-colors '
+					+ 'text-zinc-500 hover:text-red-500 hover:bg-red-100 dark:hover:bg-zinc-700 '
+					+ 'disabled:opacity-60 disabled:cursor-not-allowed'
+				}
+			>
+				{isDeleting
+					? (
+						<div className='animate-spin'>
+							<LoaderIcon />
+						</div>
+					)
+					: <TrashIcon />}
+			</button>
+		</>
+	);
+}
+
+function NoteHeaderActions(props: NoteHeaderActionsProps) {
+	return props.isEditing
+		? <EditingActions isSaving={props.isSaving} onCancelEdit={props.onCancelEdit} onSaveEdit={props.onSaveEdit} />
+		: (
+			<ViewingActions
+				isDeleting={props.isDeleting}
+				canExpand={props.canExpand}
+				canEdit={props.canEdit}
+				onNewNote={props.onNewNote}
+				onExpand={props.onExpand}
+				onStartEdit={props.onStartEdit}
+				onDelete={props.onDelete}
+			/>
+		);
+}
+
+type NoteContent = {
+	content: string;
+	truncated: boolean;
+};
+
+function NoteEditView({
+	editedContent, setEditedContent, isSaving, saveError,
+}: {
+	editedContent: string;
+	setEditedContent: (value: string) => void;
+	isSaving: boolean;
+	saveError: string | null;
+}) {
+	return (
+		<>
+			<textarea
+				value={editedContent}
+				onChange={event => {
+					setEditedContent(event.target.value);
+				}}
+				disabled={isSaving}
+				className={
+					'w-full min-h-[60vh] p-3 text-sm font-mono rounded-md resize-y '
+					+ 'text-zinc-800 bg-zinc-50 border border-zinc-200 '
+					+ 'dark:text-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 '
+					+ 'focus:outline-none focus:ring-2 focus:ring-zinc-400 disabled:opacity-60'
+				}
+			/>
+			{saveError && (
+				<div className='text-xs text-red-500'>{saveError}</div>
+			)}
+			<div className='text-xs text-zinc-400 dark:text-zinc-500 italic'>
+				Markdown is preserved as-is.
+			</div>
+		</>
+	);
+}
+
+function NoteReadView({
+	bodyRef, note, highlightsInput, onHighlightClick,
+}: {
+	bodyRef: React.RefObject<HTMLDivElement>;
+	note: NoteContent | null;
+	highlightsInput: HighlightInput[];
+	onHighlightClick: (noteFileId: number) => void;
+}) {
+	return (
+		<>
+			<div ref={bodyRef} className='text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap'>
+				{note?.content !== undefined && (
+					<HighlightedBody
+						content={note.content}
+						highlights={highlightsInput}
+						onHighlightClick={onHighlightClick}
+					/>
+				)}
+			</div>
+			{note?.truncated && (
+				<div className='text-xs text-zinc-400 dark:text-zinc-500 italic'>
+					Content truncated to ~5,000 words.
+				</div>
+			)}
+		</>
+	);
+}
+
 export function NotePage({fileId}: {fileId: number}) {
 	const router = useRouter();
 	const bodyRef = useRef<HTMLDivElement>(null);
@@ -359,20 +573,7 @@ export function NotePage({fileId}: {fileId: number}) {
 		setIsEditing(false);
 	};
 
-	const highlightsInput: Array<{quotedText: string; noteFileId: number}> = [];
-	if (sourcesData) {
-		for (const d of sourcesData.derived) {
-			if (d.sourceType !== 'manual') {
-				continue;
-			}
-
-			for (const h of d.highlights) {
-				if (h.quotedText && h.quotedText.length > 0) {
-					highlightsInput.push({quotedText: h.quotedText, noteFileId: d.fileId});
-				}
-			}
-		}
-	}
+	const highlightsInput = getHighlightsInput(sourcesData);
 
 	return (
 		<div className='flex flex-row justify-center pb-20 h-full bg-white dark:bg-zinc-900'>
@@ -382,104 +583,27 @@ export function NotePage({fileId}: {fileId: number}) {
 						{label ?? 'Loading...'}
 					</h2>
 					<div className='flex flex-row gap-2 flex-shrink-0 ml-4 items-center'>
-						{isEditing
-							? (
-								<>
-									<button
-										type='button'
-										onClick={handleCancelEdit}
-										disabled={isSaving}
-										className={
-											'text-sm px-3 py-1 rounded-md transition-colors '
-											+ 'bg-zinc-200 hover:bg-zinc-300 text-zinc-800 '
-											+ 'dark:bg-zinc-700 dark:hover:bg-zinc-600 dark:text-zinc-200 '
-											+ 'disabled:opacity-60 disabled:cursor-not-allowed'
-										}
-									>
-										Cancel
-									</button>
-									<button
-										type='button'
-										onClick={() => {
-											void handleSaveEdit();
-										}}
-										disabled={isSaving}
-										className='text-sm px-3 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed'
-									>
-										{isSaving ? 'Saving…' : 'Save'}
-									</button>
-								</>
-							)
-							: (
-								<>
-									<button
-										type='button'
-										onClick={() => {
-											setComposerState({});
-										}}
-										title='New note'
-										aria-label='New note'
-										className={
-											'p-1.5 rounded-md cursor-pointer transition-colors '
-											+ 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 dark:hover:text-zinc-200 dark:hover:bg-zinc-700'
-										}
-									>
-										<FilePlusCorner size={16} />
-									</button>
-									{canExpand && (
-										<button
-											type='button'
-											onClick={() => {
-												setIsExpanderOpen(true);
-											}}
-											title='Expand with AI'
-											aria-label='Expand with AI'
-											className={
-												'p-1.5 rounded-md cursor-pointer transition-colors '
-												+ 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 dark:hover:text-zinc-200 dark:hover:bg-zinc-700'
-											}
-										>
-											<Bot size={16} />
-										</button>
-									)}
-									{canEdit && (
-										<button
-											type='button'
-											onClick={handleStartEdit}
-											title='Edit this note'
-											aria-label='Edit this note'
-											className={
-												'p-1.5 rounded-md cursor-pointer transition-colors '
-												+ 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 dark:hover:text-zinc-200 dark:hover:bg-zinc-700'
-											}
-										>
-											<PencilEditIcon />
-										</button>
-									)}
-									<button
-										type='button'
-										onClick={() => {
-											void handleDelete();
-										}}
-										disabled={isDeleting}
-										title='Delete this file'
-										aria-label='Delete this file'
-										className={
-											'p-1.5 rounded-md cursor-pointer transition-colors '
-											+ 'text-zinc-500 hover:text-red-500 hover:bg-red-100 dark:hover:bg-zinc-700 '
-											+ 'disabled:opacity-60 disabled:cursor-not-allowed'
-										}
-									>
-										{isDeleting
-											? (
-												<div className='animate-spin'>
-													<LoaderIcon />
-												</div>
-											)
-											: <TrashIcon />}
-									</button>
-								</>
-							)}
+						<NoteHeaderActions
+							isEditing={isEditing}
+							isSaving={isSaving}
+							isDeleting={isDeleting}
+							canExpand={canExpand}
+							canEdit={canEdit}
+							onNewNote={() => {
+								setComposerState({});
+							}}
+							onExpand={() => {
+								setIsExpanderOpen(true);
+							}}
+							onStartEdit={handleStartEdit}
+							onCancelEdit={handleCancelEdit}
+							onSaveEdit={() => {
+								void handleSaveEdit();
+							}}
+							onDelete={() => {
+								void handleDelete();
+							}}
+						/>
 					</div>
 				</div>
 
@@ -496,45 +620,20 @@ export function NotePage({fileId}: {fileId: number}) {
 							<ProvenanceInfo fileId={fileId} />
 							{isEditing
 								? (
-									<>
-										<textarea
-											value={editedContent}
-											onChange={event => {
-												setEditedContent(event.target.value);
-											}}
-											disabled={isSaving}
-											className={
-												'w-full min-h-[60vh] p-3 text-sm font-mono rounded-md resize-y '
-												+ 'text-zinc-800 bg-zinc-50 border border-zinc-200 '
-												+ 'dark:text-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 '
-												+ 'focus:outline-none focus:ring-2 focus:ring-zinc-400 disabled:opacity-60'
-											}
-										/>
-										{saveError && (
-											<div className='text-xs text-red-500'>{saveError}</div>
-										)}
-										<div className='text-xs text-zinc-400 dark:text-zinc-500 italic'>
-											Markdown is preserved as-is.
-										</div>
-									</>
+									<NoteEditView
+										editedContent={editedContent}
+										setEditedContent={setEditedContent}
+										isSaving={isSaving}
+										saveError={saveError}
+									/>
 								)
 								: (
-									<>
-										<div ref={bodyRef} className='text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap'>
-											{note?.content !== undefined && (
-												<HighlightedBody
-													content={note.content}
-													highlights={highlightsInput}
-													onHighlightClick={setPopoverNoteId}
-												/>
-											)}
-										</div>
-										{note?.truncated && (
-											<div className='text-xs text-zinc-400 dark:text-zinc-500 italic'>
-												Content truncated to ~5,000 words.
-											</div>
-										)}
-									</>
+									<NoteReadView
+										bodyRef={bodyRef}
+										note={note}
+										highlightsInput={highlightsInput}
+										onHighlightClick={setPopoverNoteId}
+									/>
 								)}
 						</div>
 					)}

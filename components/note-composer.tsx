@@ -109,7 +109,11 @@ export function NoteComposer({parentFileId, parentLabel, quotedText, onClose}: N
 							setTitle(event.target.value);
 						}}
 						placeholder={defaultTitle}
-						className='w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1 text-sm outline-none text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400'
+						className={
+							'w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 '
+							+ 'rounded-md px-2 py-1 text-sm outline-none text-zinc-800 dark:text-zinc-200 '
+							+ 'placeholder:text-zinc-400'
+						}
 					/>
 					<textarea
 						ref={textareaRef}
@@ -119,7 +123,11 @@ export function NoteComposer({parentFileId, parentLabel, quotedText, onClose}: N
 						}}
 						placeholder='Write your note…'
 						rows={10}
-						className='w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-2 text-sm outline-none text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 resize-none font-mono'
+						className={
+							'w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 '
+							+ 'rounded-md px-2 py-2 text-sm outline-none text-zinc-800 dark:text-zinc-200 '
+							+ 'placeholder:text-zinc-400 resize-none font-mono'
+						}
 					/>
 					{errorMessage && (
 						<div className='text-xs text-red-500'>{errorMessage}</div>
@@ -140,7 +148,11 @@ export function NoteComposer({parentFileId, parentLabel, quotedText, onClose}: N
 							void handleSave();
 						}}
 						disabled={!canSave}
-						className='text-xs px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-zinc-800'
+						className={
+							'text-xs px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-50 '
+							+ 'transition-colors disabled:opacity-60 disabled:cursor-not-allowed '
+							+ 'disabled:hover:bg-zinc-800'
+						}
 					>
 						{status === 'saving' ? 'Saving…' : 'Save'}
 					</button>

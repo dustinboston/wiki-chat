@@ -1,5 +1,5 @@
-import {config} from 'dotenv';
 import {spawnSync} from 'node:child_process';
+import {config} from 'dotenv';
 import postgres from 'postgres';
 
 config({path: '.env.local'});
@@ -19,7 +19,7 @@ if (!confirmed) {
 	console.log('');
 	console.log('Re-run with --yes to proceed:');
 	console.log('  pnpm db:reset --yes');
-	process.exit(1);
+	throw new Error('Aborted: re-run with --yes to confirm');
 }
 
 const sql = postgres(`${url}?sslmode=require`);
@@ -46,7 +46,7 @@ const result = spawnSync('pnpm', ['db:migrate'], {
 });
 
 if (result.status !== 0) {
-	process.exit(result.status ?? 1);
+	throw new Error(`Migration failed with status ${result.status ?? 'unknown'}`);
 }
 
 console.log('Database reset complete.');
